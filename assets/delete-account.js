@@ -185,4 +185,46 @@
           // Hide the modal
           this.hideModal();
           
-          // Create and show success notifica
+          // Create and show success notification
+          var $notification = $('<div class="user-delete-success-notification">')
+              .html('<div class="success-content"><strong>✓ ' + message + '</strong><br>You will be redirected shortly...</div>')
+              .css({
+                  position: 'fixed',
+                  top: '20px',
+                  right: '20px',
+                  background: '#4CAF50',
+                  color: 'white',
+                  padding: '15px 20px',
+                  borderRadius: '5px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  zIndex: 10000,
+                  maxWidth: '400px',
+                  fontSize: '14px',
+                  lineHeight: '1.4'
+              });
+          
+          $('body').append($notification);
+          
+          // Animate in
+          $notification.hide().fadeIn(300);
+      },
+      
+      /**
+       * Utility: Log debug information
+       */
+      log: function(message, data) {
+          if (console && console.log) {
+              console.log('[User Self Delete] ' + message, data || '');
+          }
+      }
+  };
+  
+  // Initialize when document is ready
+  $(document).ready(function() {
+      UserSelfDelete.init();
+  });
+  
+  // Make available globally for debugging
+  window.UserSelfDelete = UserSelfDelete;
+
+})(jQuery);
