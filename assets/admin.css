@@ -1,0 +1,91 @@
+/**
+ * User Self Delete - Admin Styles
+ */
+
+.user-self-delete-admin .form-table th {
+  width: 200px;
+  padding: 15px 10px 15px 0;
+}
+
+.user-self-delete-admin .form-table td {
+  padding: 15px 10px;
+}
+
+.user-self-delete-admin .description {
+  font-style: italic;
+  color: #666;
+  margin-top: 5px;
+}
+
+.user-self-delete-admin .postbox {
+  margin-top: 20px;
+}
+
+.user-self-delete-admin .postbox .hndle {
+  border-bottom: 1px solid #ddd;
+  padding: 8px 12px;
+}
+
+.user-self-delete-admin .postbox .inside {
+  padding: 12px;
+}
+
+.user-self-delete-admin .widefat {
+  margin-top: 10px;
+}
+
+.user-self-delete-admin .widefat th,
+.user-self-delete-admin .widefat td {
+  padding: 8px 10px;
+}
+
+.gdpr-compliance-info h4 {
+  color: #0073aa;
+  margin-top: 15px;
+  margin-bottom: 8px;
+}
+
+.gdpr-compliance-info ul {
+  margin-left: 20px;
+}
+
+.gdpr-compliance-info li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+/* Statistics table styling */
+.user-self-delete-admin .widefat tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.user-self-delete-admin .widefat tr:hover {
+  background-color: #f0f0f0;
+}
+
+/* Radio button styling */
+.user-self-delete-admin input[type="radio"] {
+  margin-right: 8px;
+}
+
+.user-self-delete-admin label {
+  display: block;
+  margin-bottom: 8px;
+  padding: 5px 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 782px) {
+
+  .user-self-delete-admin .form-table th,
+  .user-self-delete-admin .form-table td {
+    display: block;
+    width: auto;
+    padding: 10px 0;
+  }
+
+  .user-self-delete-admin .form-table th {
+    width: auto;
+    padding-bottom: 5px;
+  }
+}
