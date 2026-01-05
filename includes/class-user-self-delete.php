@@ -1,52 +1,166 @@
 <?php
-
 /**
- * Core functionality for user self-delete
+ * Core functionality for user self-delete.
+ *
+ * @package UserSelfDelete
+ * @since 1.0.0
  */
 
-if (!defined('ABSPATH')) {
-  exit;
+declare(strict_types=1);
+
+// Prevent direct access.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
-class User_Self_Delete_Core
-{
+/**
+ * Core class for user self-delete functionality.
+ *
+ * @since 1.0.0
+ */
+final class User_Self_Delete_Core {
 
-  private static $instance = null;
+	/**
+	 * Instance of this class.
+	 *
+	 * @var User_Self_Delete_Core|null
+	 */
+	private static ?User_Self_Delete_Core $instance = null;
 
-  public static function get_instance()
-  {
-    if (null === self::$instance) {
-      self::$instance = new self();
-    }
-    return self::$instance;
-  }
+	/**
+	 * Get instance.
+	 *
+	 * @return User_Self_Delete_Core
+	 */
+	public static function get_instance(): User_Self_Delete_Core {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
 
-  private function __construct()
-  {
-    add_action('init', array($this, 'init'));
-  }
+	/**
+	 * Constructor.
+	 */
+	private function __construct() {
+		add_action( 'init', array( $this, 'init' ) );
+	}
 
-  public function init()
-  {
-    // Only load for logged-in users
-    if (!is_user_logged_in()) {
-      return;
-    }
+	/**
+	 * Initialize.
+	 */
+	public function init(): void {
+		// Only load for logged-in users.
+		if ( ! is_user_logged_in() ) {
+			return;
+		}
 
-    // Add hooks
-    add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
-    add_action('wp_ajax_delete_user_account', array($this, 'handle_account_deletion'));
+		// Add hooks.
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+		add_action( 'wp_ajax_delete_user_account', array( $this, 'handle_account_deletion' ) );
 
-    // WooCommerce integration
-    if (class_exists('WooCommerce')) {
-      add_action('woocommerce_account_dashboard', array($this, 'add_delete_button_to_dashboard'));
-      add_action('woocommerce_account_content', array($this, 'maybe_add_delete_section'));
-    } else {
-      // Standard WordPress My Account (if using a profile plugin or custom implementation)
-      add_action('show_user_profile', array($this, 'add_delete_button_to_profile'));
-      add_action('edit_user_profile', array($this, 'add_delete_button_to_profile'));
-    }
-  }
+		// Register REST API endpoints.
+		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+
+		// WooCommerce integration.
+		if ( class_exists( 'WooCommerce' ) ) {
+			add_action( 'woocommerce_account_dashboard', array( $this, 'add_delete_button_to_dashboard' ) );
+		} else {
+			// Standard WordPress profile.
+			add_action( 'show_user_profile', array( $this, 'add_delete_button_to_profile' ) );
+			add_action( 'edit_user_profile', array( $this, 'add_delete_button_to_profile' ) );
+		}
+	}
+
+	/**
+	 * Register REST API routes.
+	 *
+	 * @since 2.0.0
+	 */
+	public function register_rest_routes(): void {
+		register_rest_route(
+			'user-self-delete/v1',
+			'/delete-account',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'rest_delete_account' ),
+				'permission_callback' => array( $this, 'rest_permission_check' ),
+				'args'                => array(
+					'password' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * REST API permission check.
+	 *
+	 * @return bool|WP_Error
+	 */
+	public function rest_permission_check() {
+		if ( ! is_user_logged_in() ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'You must be logged in to delete your account.', 'user-self-delete' ),
+				array( 'status' => 401 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * REST API delete account handler.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function rest_delete_account( WP_REST_Request $request ) {
+		$password     = $request->get_param( 'password' );
+		$current_user = wp_get_current_user();
+
+		// Verify password.
+		if ( ! wp_check_password( $password, $current_user->user_pass, $current_user->ID ) ) {
+			return new WP_Error(
+				'invalid_password',
+				__( 'Invalid password.', 'user-self-delete' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		// Log the deletion attempt.
+		$this->log_deletion_attempt( $current_user );
+
+		// Perform the deletion.
+		$data_eraser = new User_Self_Delete_Data_Eraser();
+		$result      = $data_eraser->delete_user_data( $current_user->ID );
+
+		if ( $result['success'] ) {
+			// Send admin notification if enabled.
+			if ( get_option( 'user_self_delete_admin_notification', 1 ) ) {
+				$this->send_admin_notification( $current_user );
+			}
+
+			return new WP_REST_Response(
+				array(
+					'success'  => true,
+					'message'  => __( 'Your account has been successfully deleted.', 'user-self-delete' ),
+					'redirect' => home_url(),
+				),
+				200
+			);
+		}
+
+		return new WP_Error(
+			'deletion_failed',
+			$result['message'],
+			array( 'status' => 500 )
+		);
+	}
 
   /**
    * Enqueue scripts and styles
