@@ -198,12 +198,6 @@ class UserSelfDelete {
 			return;
 		}
 
-		// Show confirmation dialog.
-		const confirmText = this.config.confirmText || 'Are you sure you want to permanently delete your account? This action cannot be undone.';
-		if ( ! confirm( confirmText ) ) {
-			return;
-		}
-
 		// Disable button and show processing state.
 		const originalText = this.confirmButton.textContent;
 		this.confirmButton.disabled = true;
@@ -218,7 +212,8 @@ class UserSelfDelete {
 			}
 		} catch ( error ) {
 			console.error( 'Deletion request failed:', error );
-			this.showError( this.config.error || 'An error occurred. Please try again.' );
+			// Show the actual error message from the server, or fall back to generic message
+			this.showError( error.message || this.config.error || 'An error occurred. Please try again.' );
 			this.confirmButton.disabled = false;
 			this.confirmButton.textContent = originalText;
 		}
@@ -242,7 +237,9 @@ class UserSelfDelete {
 		const data = await response.json();
 
 		if ( ! response.ok ) {
-			throw new Error( data.message || 'Request failed' );
+			// Extract the error message from the WordPress REST API error response
+			const errorMessage = data.message || ( data.data && data.data.message ) || 'Request failed';
+			throw new Error( errorMessage );
 		}
 
 		if ( data.success ) {
@@ -251,9 +248,7 @@ class UserSelfDelete {
 				window.location.href = data.redirect || '/';
 			}, 2000 );
 		} else {
-			this.showError( data.message || 'An error occurred' );
-			this.confirmButton.disabled = false;
-			this.confirmButton.textContent = this.config.deleteButton;
+			throw new Error( data.message || 'An error occurred' );
 		}
 	}
 
@@ -281,9 +276,8 @@ class UserSelfDelete {
 				window.location.href = data.data.redirect || '/';
 			}, 2000 );
 		} else {
-			this.showError( data.data || 'An error occurred' );
-			this.confirmButton.disabled = false;
-			this.confirmButton.textContent = this.config.deleteButton;
+			// Throw error to be caught by try/catch block
+			throw new Error( data.data || 'An error occurred' );
 		}
 	}
 

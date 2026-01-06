@@ -75,7 +75,7 @@ final class User_Self_Delete_Core {
 
 		// WooCommerce integration.
 		if ( class_exists( 'WooCommerce' ) ) {
-			add_action( 'woocommerce_account_dashboard', array( $this, 'add_delete_button_to_dashboard' ) );
+			add_action( 'woocommerce_after_edit_account_form', array( $this, 'add_delete_button_to_account_details' ) );
 		} else {
 			// Standard WordPress profile.
 			add_action( 'show_user_profile', array( $this, 'add_delete_button_to_profile' ) );
@@ -280,22 +280,22 @@ final class User_Self_Delete_Core {
 				'nonce'           => wp_create_nonce( 'wp_rest' ),
 				'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
 				'ajaxNonce'       => wp_create_nonce( 'delete_user_account' ),
-				'confirmText'     => __( 'Are you sure you want to permanently delete your account? This action cannot be undone.', 'user-self-delete' ),
-				'passwordLabel'   => __( 'Enter your password to confirm:', 'user-self-delete' ),
-				'deleteButton'    => __( 'Yes, Delete My Account', 'user-self-delete' ),
-				'cancelButton'    => __( 'Cancel', 'user-self-delete' ),
+				'passwordLabel'   => __( 'Please enter your password', 'user-self-delete' ),
+				'deleteButton'    => __( 'Delete My Account', 'user-self-delete' ),
 				'processing'      => __( 'Processing...', 'user-self-delete' ),
 				'error'           => __( 'An error occurred. Please try again.', 'user-self-delete' ),
-				'invalidPassword' => __( 'Invalid password. Please try again.', 'user-self-delete' ),
 			)
 		);
 	}
 
 	/**
-	 * Add delete button to WooCommerce dashboard.
+	 * Add delete button to WooCommerce account details page.
 	 */
-	public function add_delete_button_to_dashboard(): void {
-		$this->render_delete_section();
+	public function add_delete_button_to_account_details(): void {
+		echo '<fieldset class="user-self-delete-fieldset">';
+		echo '<legend>' . esc_html__( 'Delete Account', 'user-self-delete' ) . '</legend>';
+		$this->render_delete_section( false );
+		echo '</fieldset>';
 	}
 
 	/**
@@ -328,29 +328,10 @@ final class User_Self_Delete_Core {
 	private function render_delete_section( bool $show_wrapper = true ): void {
 		if ( $show_wrapper ) {
 			echo '<div class="user-self-delete-section woocommerce-MyAccount-content">';
-			echo '<h3>' . esc_html__( 'Delete Account', 'user-self-delete' ) . '</h3>';
 		}
 
 		echo '<div class="user-delete-info">';
-		echo '<p>' . esc_html__( 'You can permanently delete your account and all associated data. This action cannot be undone.', 'user-self-delete' ) . '</p>';
-
-		// Show what will be deleted.
-		echo '<div class="deletion-details">';
-		echo '<h4>' . esc_html__( 'What will be deleted:', 'user-self-delete' ) . '</h4>';
-		echo '<ul>';
-		echo '<li>' . esc_html__( 'Your user account and profile information', 'user-self-delete' ) . '</li>';
-		echo '<li>' . esc_html__( 'Personal data associated with your account', 'user-self-delete' ) . '</li>';
-
-		if ( class_exists( 'WooCommerce' ) ) {
-			if ( get_option( 'user_self_delete_anonymize_orders', 1 ) ) {
-				echo '<li>' . esc_html__( 'Order history will be anonymized (required for tax/legal compliance)', 'user-self-delete' ) . '</li>';
-			} else {
-				echo '<li>' . esc_html__( 'Order history will be permanently deleted', 'user-self-delete' ) . '</li>';
-			}
-		}
-
-		echo '</ul>';
-		echo '</div>';
+		echo '<p>' . esc_html__( 'If you no longer wish to use this account, you can permanently delete it along with all associated data.', 'user-self-delete' ) . '</p>';
 
 		echo '<button type="button" class="button delete-account-btn" id="delete-account-trigger">';
 		echo esc_html__( 'Delete My Account', 'user-self-delete' );
@@ -374,36 +355,12 @@ final class User_Self_Delete_Core {
 		<div id="delete-account-modal" class="user-delete-modal" style="display: none;">
 			<div class="modal-content">
 				<div class="modal-header">
-					<h3><?php echo esc_html__( 'Confirm Account Deletion', 'user-self-delete' ); ?></h3>
+					<h3><?php echo esc_html__( 'Delete Account', 'user-self-delete' ); ?></h3>
 					<span class="close-modal">&times;</span>
 				</div>
 				<div class="modal-body">
-					<div class="warning-message">
-						<p><strong><?php echo esc_html__( 'Warning: This action is permanent and cannot be undone.', 'user-self-delete' ); ?></strong></p>
-					</div>
-
-					<div class="deletion-info">
-						<h4><?php echo esc_html__( 'The following data will be permanently deleted:', 'user-self-delete' ); ?></h4>
-						<ul>
-							<li><?php echo esc_html__( 'Your user account and profile', 'user-self-delete' ); ?></li>
-							<li><?php echo esc_html__( 'All personal information', 'user-self-delete' ); ?></li>
-							<li><?php echo esc_html__( 'Account preferences and settings', 'user-self-delete' ); ?></li>
-							<?php if ( class_exists( 'WooCommerce' ) ) : ?>
-								<li>
-									<?php
-									if ( get_option( 'user_self_delete_anonymize_orders', 1 ) ) {
-										echo esc_html__( 'Order data will be anonymized (billing/shipping info removed)', 'user-self-delete' );
-									} else {
-										echo esc_html__( 'All order history', 'user-self-delete' );
-									}
-									?>
-								</li>
-							<?php endif; ?>
-						</ul>
-					</div>
-
 					<div class="password-confirmation">
-						<label for="confirm-password"><?php echo esc_html__( 'Enter your password to confirm:', 'user-self-delete' ); ?></label>
+						<label for="confirm-password"><?php echo esc_html__( 'Enter your password to confirm deletion:', 'user-self-delete' ); ?></label>
 						<input type="password" id="confirm-password" name="confirm_password" required autocomplete="current-password">
 						<div class="password-error" style="display: none;" role="alert"></div>
 					</div>
@@ -411,7 +368,7 @@ final class User_Self_Delete_Core {
 				<div class="modal-footer">
 					<button type="button" class="button" id="cancel-deletion"><?php echo esc_html__( 'Cancel', 'user-self-delete' ); ?></button>
 					<button type="button" class="button button-primary button-delete" id="confirm-deletion" disabled>
-						<?php echo esc_html__( 'Yes, Delete My Account', 'user-self-delete' ); ?>
+						<?php echo esc_html__( 'Delete My Account', 'user-self-delete' ); ?>
 					</button>
 				</div>
 			</div>

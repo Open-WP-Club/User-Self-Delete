@@ -46,6 +46,10 @@ final class User_Self_Delete_Admin {
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'init_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_scripts' ) );
+		add_action( 'admin_notices', array( $this, 'activation_notice' ) );
+
+		// Add settings link to plugins page.
+		add_filter( 'plugin_action_links_' . USER_SELF_DELETE_PLUGIN_BASENAME, array( $this, 'add_settings_link' ) );
 
 		// Add custom column to users list.
 		add_filter( 'manage_users_columns', array( $this, 'add_deletion_status_column' ) );
@@ -69,6 +73,59 @@ final class User_Self_Delete_Admin {
 			'user-self-delete',
 			array( $this, 'admin_page' )
 		);
+	}
+
+	/**
+	 * Display activation notice.
+	 */
+	public function activation_notice(): void {
+		// Only show to admins.
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		// Check if the activation transient is set.
+		if ( ! get_transient( 'user_self_delete_activated' ) ) {
+			return;
+		}
+
+		// Delete the transient so it only shows once.
+		delete_transient( 'user_self_delete_activated' );
+
+		$settings_url = admin_url( 'options-general.php?page=user-self-delete' );
+		?>
+		<div class="notice notice-success is-dismissible">
+			<p>
+				<strong><?php esc_html_e( 'User Self Delete is now active!', 'user-self-delete' ); ?></strong>
+			</p>
+			<p>
+				<?php
+				printf(
+					/* translators: %s: Settings page URL */
+					wp_kses_post( __( 'Please <a href="%s">configure your settings</a> to select countries where you have customers and set your data retention preferences.', 'user-self-delete' ) ),
+					esc_url( $settings_url )
+				);
+				?>
+			</p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Add settings link to plugins page.
+	 *
+	 * @param array $links Plugin action links.
+	 * @return array
+	 */
+	public function add_settings_link( array $links ): array {
+		$settings_link = sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'options-general.php?page=user-self-delete' ) ),
+			esc_html__( 'Settings', 'user-self-delete' )
+		);
+
+		array_unshift( $links, $settings_link );
+		return $links;
 	}
 
 	/**
@@ -266,36 +323,68 @@ final class User_Self_Delete_Admin {
 			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'user-self-delete' ) );
 		}
 		?>
-		<div class="wrap">
+		<div class="wrap user-self-delete-wrap">
 			<h1><?php echo esc_html__( 'User Self Delete Settings', 'user-self-delete' ); ?></h1>
+			<p class="description" style="font-size: 14px; margin-bottom: 20px;">
+				<?php echo esc_html__( 'Allow users to delete their own accounts while staying compliant with GDPR and local data retention laws.', 'user-self-delete' ); ?>
+			</p>
 
 			<div class="user-self-delete-admin">
-				<form method="post" action="options.php">
-					<?php
-					settings_fields( 'user_self_delete_settings' );
-					do_settings_sections( 'user_self_delete_settings' );
-					submit_button();
-					?>
-				</form>
+				<!-- Quick Info Box -->
+				<div class="notice notice-info" style="padding: 15px; margin: 20px 0;">
+					<h3 style="margin-top: 0;"><?php echo esc_html__( 'Quick Start Guide', 'user-self-delete' ); ?></h3>
+					<ol style="margin: 10px 0; padding-left: 20px;">
+						<li><?php echo esc_html__( 'Select all countries where you have customers', 'user-self-delete' ); ?></li>
+						<li><?php echo esc_html__( 'The plugin will automatically calculate the required data retention period', 'user-self-delete' ); ?></li>
+						<li><?php echo esc_html__( 'Configure your preferences for handling orders and content', 'user-self-delete' ); ?></li>
+						<li><?php echo esc_html__( 'Save your settings', 'user-self-delete' ); ?></li>
+					</ol>
+					<p style="margin-bottom: 0;">
+						<?php
+						if ( class_exists( 'WooCommerce' ) ) {
+							echo esc_html__( 'Users can delete their accounts from: My Account > Account Details', 'user-self-delete' );
+						} else {
+							echo esc_html__( 'Users can delete their accounts from their profile page', 'user-self-delete' );
+						}
+						?>
+					</p>
+				</div>
 
-				<div class="postbox" style="margin-top: 20px;">
-					<h2 class="hndle"><span><?php echo esc_html__( 'Deletion Statistics', 'user-self-delete' ); ?></span></h2>
+				<!-- Settings Form -->
+				<div class="postbox">
+					<div class="inside">
+						<form method="post" action="options.php">
+							<?php
+							settings_fields( 'user_self_delete_settings' );
+							do_settings_sections( 'user_self_delete_settings' );
+							submit_button( __( 'Save Settings', 'user-self-delete' ), 'primary large' );
+							?>
+						</form>
+					</div>
+				</div>
+
+				<!-- Statistics Cards -->
+				<h2 style="margin-top: 30px;"><?php echo esc_html__( 'Account Deletion Overview', 'user-self-delete' ); ?></h2>
+
+				<div class="postbox">
+					<h3 class="hndle" style="padding: 15px;"><span><?php echo esc_html__( 'Deletion Statistics', 'user-self-delete' ); ?></span></h3>
 					<div class="inside">
 						<?php $this->display_deletion_stats(); ?>
 					</div>
 				</div>
 
 				<?php if ( get_option( 'user_self_delete_enable_logging', 1 ) ) : ?>
-					<div class="postbox" style="margin-top: 20px;">
-						<h2 class="hndle"><span><?php echo esc_html__( 'Recent Deletions', 'user-self-delete' ); ?></span></h2>
+					<div class="postbox">
+						<h3 class="hndle" style="padding: 15px;"><span><?php echo esc_html__( 'Recent Deletions', 'user-self-delete' ); ?></span></h3>
 						<div class="inside">
 							<?php $this->display_deletion_log(); ?>
 						</div>
 					</div>
 				<?php endif; ?>
 
-				<div class="postbox" style="margin-top: 20px;">
-					<h2 class="hndle"><span><?php echo esc_html__( 'GDPR Compliance Information', 'user-self-delete' ); ?></span></h2>
+				<!-- GDPR Info -->
+				<div class="postbox">
+					<h3 class="hndle" style="padding: 15px;"><span><?php echo esc_html__( 'GDPR & Legal Compliance', 'user-self-delete' ); ?></span></h3>
 					<div class="inside">
 						<?php $this->display_gdpr_info(); ?>
 					</div>
@@ -309,21 +398,27 @@ final class User_Self_Delete_Admin {
 	 * General section callback.
 	 */
 	public function general_section_callback(): void {
-		echo '<p>' . esc_html__( 'Configure general settings for user account deletion.', 'user-self-delete' ) . '</p>';
+		echo '<p class="description" style="font-size: 13px; margin-bottom: 15px;">' . esc_html__( 'Control logging, notifications, and other general behavior for account deletions.', 'user-self-delete' ) . '</p>';
 	}
 
 	/**
 	 * WooCommerce section callback.
 	 */
 	public function woocommerce_section_callback(): void {
-		echo '<p>' . esc_html__( 'Configure how WooCommerce data is handled during account deletion.', 'user-self-delete' ) . '</p>';
+		echo '<p class="description" style="font-size: 13px; margin-bottom: 15px;">';
+		echo esc_html__( 'Choose how to handle WooCommerce orders when users delete their accounts. ', 'user-self-delete' );
+		echo '<strong>' . esc_html__( 'Tip:', 'user-self-delete' ) . '</strong> ';
+		echo esc_html__( 'Anonymizing orders (recommended) preserves business records for tax compliance while removing personal data.', 'user-self-delete' );
+		echo '</p>';
 	}
 
 	/**
 	 * Content section callback.
 	 */
 	public function content_section_callback(): void {
-		echo '<p>' . esc_html__( 'Configure how user-generated content is handled during account deletion.', 'user-self-delete' ) . '</p>';
+		echo '<p class="description" style="font-size: 13px; margin-bottom: 15px;">';
+		echo esc_html__( 'Decide what happens to posts, comments, and other content created by users when they delete their accounts.', 'user-self-delete' );
+		echo '</p>';
 	}
 
 	/**
@@ -375,7 +470,14 @@ final class User_Self_Delete_Admin {
 	 * Retention section callback.
 	 */
 	public function retention_section_callback(): void {
-		echo '<p>' . esc_html__( 'Configure data retention periods for legal compliance. Select countries where you have customers to automatically calculate the required retention period based on tax and legal requirements.', 'user-self-delete' ) . '</p>';
+		echo '<div class="notice notice-warning inline" style="margin: 0 0 15px 0; padding: 10px;">';
+		echo '<p style="margin: 0;"><strong>' . esc_html__( 'Important:', 'user-self-delete' ) . '</strong> ';
+		echo esc_html__( 'Select all countries where you have customers. The plugin will automatically use the longest required retention period to ensure legal compliance.', 'user-self-delete' );
+		echo '</p>';
+		echo '</div>';
+		echo '<p class="description" style="font-size: 13px; margin-bottom: 15px;">';
+		echo esc_html__( 'Different countries require businesses to keep financial and tax records for varying periods. When a user deletes their account, their data is archived and permanently deleted only after the required retention period expires.', 'user-self-delete' );
+		echo '</p>';
 	}
 
 	/**

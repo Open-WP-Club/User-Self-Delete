@@ -2,32 +2,63 @@
  * User Self Delete - Admin Styles
  */
 
+/* Main wrapper improvements */
+.user-self-delete-wrap h1 {
+  margin-bottom: 8px;
+}
+
+.user-self-delete-wrap .description {
+  color: #646970;
+  line-height: 1.6;
+}
+
+/* Form table styling */
 .user-self-delete-admin .form-table th {
-  width: 200px;
-  padding: 15px 10px 15px 0;
+  width: 250px;
+  padding: 20px 10px 20px 0;
+  font-weight: 600;
+  color: #1d2327;
 }
 
 .user-self-delete-admin .form-table td {
-  padding: 15px 10px;
+  padding: 20px 10px;
+}
+
+.user-self-delete-admin .form-table tr {
+  border-bottom: 1px solid #f0f0f1;
+}
+
+.user-self-delete-admin .form-table tr:last-child {
+  border-bottom: none;
 }
 
 .user-self-delete-admin .description {
-  font-style: italic;
-  color: #666;
-  margin-top: 5px;
+  color: #646970;
+  margin-top: 8px;
+  line-height: 1.5;
+  display: block;
 }
 
+/* Postbox improvements */
 .user-self-delete-admin .postbox {
   margin-top: 20px;
+  border: 1px solid #c3c4c7;
+  box-shadow: 0 1px 1px rgba(0,0,0,.04);
+  background: #fff;
 }
 
 .user-self-delete-admin .postbox .hndle {
-  border-bottom: 1px solid #ddd;
-  padding: 8px 12px;
+  border-bottom: 1px solid #c3c4c7;
+  padding: 15px;
+  background: #f6f7f7;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d2327;
 }
 
 .user-self-delete-admin .postbox .inside {
-  padding: 12px;
+  padding: 20px;
+  line-height: 1.6;
 }
 
 .user-self-delete-admin .widefat {
@@ -39,19 +70,34 @@
   padding: 8px 10px;
 }
 
+/* GDPR info box */
 .gdpr-compliance-info h4 {
-  color: #0073aa;
-  margin-top: 15px;
-  margin-bottom: 8px;
+  color: #2271b1;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.gdpr-compliance-info h4:first-child {
+  margin-top: 0;
 }
 
 .gdpr-compliance-info ul {
   margin-left: 20px;
+  margin-bottom: 15px;
 }
 
 .gdpr-compliance-info li {
-  margin-bottom: 8px;
-  line-height: 1.5;
+  margin-bottom: 10px;
+  line-height: 1.6;
+  color: #50575e;
+}
+
+.gdpr-compliance-info p {
+  color: #50575e;
+  line-height: 1.6;
+  margin-bottom: 12px;
 }
 
 /* Statistics table styling */
@@ -63,8 +109,9 @@
   background-color: #f0f0f0;
 }
 
-/* Radio button styling */
-.user-self-delete-admin input[type="radio"] {
+/* Radio and checkbox styling */
+.user-self-delete-admin input[type="radio"],
+.user-self-delete-admin input[type="checkbox"] {
   margin-right: 8px;
 }
 
@@ -72,6 +119,56 @@
   display: block;
   margin-bottom: 8px;
   padding: 5px 0;
+  color: #1d2327;
+}
+
+/* Country selection styling */
+.user-self-delete-countries {
+  margin-top: 10px;
+}
+
+.user-self-delete-countries h4 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  color: #1d2327;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid #c3c4c7;
+  padding-bottom: 8px;
+}
+
+.user-self-delete-countries h4:first-child {
+  margin-top: 0;
+}
+
+.user-self-delete-countries .country-group {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f6f7f7;
+  border-radius: 4px;
+}
+
+.user-self-delete-countries .country-group label {
+  padding: 5px 8px;
+  margin-bottom: 3px;
+  transition: background-color 0.2s;
+}
+
+.user-self-delete-countries .country-group label:hover {
+  background: #fff;
+  border-radius: 3px;
+}
+
+/* Submit button styling */
+.user-self-delete-admin .submit {
+  padding: 0;
+  margin: 20px 0 0 0;
+}
+
+.user-self-delete-admin .button-primary.button-large {
+  padding: 8px 20px;
+  height: auto;
+  font-size: 14px;
 }
 
 /* Responsive adjustments */

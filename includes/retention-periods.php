@@ -23,6 +23,27 @@ final class User_Self_Delete_Retention_Periods {
 	/**
 	 * Get all countries with their retention periods.
 	 *
+	 * HOW TO ADD NEW COUNTRIES:
+	 * ========================
+	 * To add a new country, simply add a new entry to the array below with:
+	 * - Country code (ISO 3166-1 alpha-2, e.g., 'FR', 'US', 'JP')
+	 * - Country name
+	 * - Retention period in years (based on tax/legal requirements)
+	 * - Region for grouping in the admin UI
+	 *
+	 * Example:
+	 * 'FR' => array(
+	 *     'name'   => 'France',
+	 *     'years'  => 10,
+	 *     'region' => 'EU',
+	 * ),
+	 *
+	 * Available regions: 'EU', 'EEA', 'UK', 'Europe', 'North America',
+	 *                    'South America', 'Asia', 'Oceania', 'Middle East', 'Africa'
+	 *
+	 * Note: The retention period should reflect the longest legal requirement
+	 * for keeping business/tax records in that country.
+	 *
 	 * @return array<string, array{name: string, years: int, region: string}> Country data.
 	 */
 	public static function get_countries(): array {

@@ -27,7 +27,8 @@ GDPR-compliant WordPress plugin for user self-deletion with country-based data r
 - **WooCommerce HPOS**: Compatible with High-Performance Order Storage
 - **REST API**: Modern endpoint for account deletion
 - **Vanilla JavaScript**: No jQuery dependency
-- **Security Hardened**: Admin deletion prevention, IP validation, XSS-safe
+- **Simplified UX**: Single-step password confirmation, integrated account details placement
+- **Security Hardened**: Admin deletion prevention, IP validation, XSS-safe, clear error messaging
 
 ## Requirements
 
@@ -68,14 +69,22 @@ GDPR-compliant WordPress plugin for user self-deletion with country-based data r
 ### For Users
 
 **WooCommerce Sites:**
-1. Go to **My Account > Dashboard**
-2. Click **"Delete My Account"**
-3. Enter password to confirm
-4. Account deleted immediately, data archived per retention period
+1. Go to **My Account > Account Details**
+2. Scroll to the **"Delete Account"** section
+3. Click **"Delete My Account"** button
+4. Enter your password in the confirmation modal
+5. Click **"Delete My Account"** to confirm
+6. Account deleted immediately, data archived per retention period
 
 **Standard WordPress:**
 - Available in user profile page
-- Same deletion process
+- Same streamlined deletion process
+
+**Simplified Interface:**
+- Single password confirmation step
+- Clear error messages (e.g., admins cannot self-delete)
+- No redundant warning prompts
+- Clean, integrated design
 
 ### For Administrators
 
@@ -214,14 +223,44 @@ The plugin includes retention periods for 40+ countries:
 
 View full list in admin settings.
 
+### Adding New Countries
+
+To add a new country to the plugin:
+
+1. Open `includes/retention-periods.php`
+2. Find the `get_countries()` method (around line 49)
+3. Add your country entry following this format:
+
+```php
+'XX' => array(
+    'name'   => 'Country Name',
+    'years'  => 7,  // Retention period in years
+    'region' => 'Region Name',
+),
+```
+
+**Example:**
+```php
+'FR' => array(
+    'name'   => 'France',
+    'years'  => 10,
+    'region' => 'EU',
+),
+```
+
+**Available regions:** EU, EEA, UK, Europe, North America, South America, Asia, Oceania, Middle East, Africa
+
+The retention period should reflect the longest legal requirement for keeping business/tax records in that country.
+
 ## Security Features
 
-- Password verification required
-- Admin accounts cannot self-delete
-- IP address logging for audit
+- Password verification required for all deletions
+- Admin accounts cannot self-delete (with clear error message)
+- IP address logging for audit trail
 - XSS-safe DOM manipulation
-- Proper nonce verification
+- Proper nonce verification (REST API and AJAX)
 - SQL injection prevention
+- Descriptive error messages for better user experience
 
 ## Migration
 

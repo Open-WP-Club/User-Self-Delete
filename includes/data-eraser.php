@@ -115,6 +115,9 @@ final class User_Self_Delete_Data_Eraser {
 	private function soft_delete_user( int $user_id, WP_User $user, int $retention_years ): array {
 		global $wpdb;
 
+		// Load required WordPress admin functions.
+		require_once ABSPATH . 'wp-admin/includes/user.php';
+
 		// Hook: Before user soft deletion.
 		do_action( 'user_self_delete_before_soft_deletion', $user_id, $user );
 
@@ -206,6 +209,9 @@ final class User_Self_Delete_Data_Eraser {
 	 * @return array{success: bool, message: string} Result.
 	 */
 	private function hard_delete_user( int $user_id, WP_User $user ): array {
+		// Load required WordPress admin functions.
+		require_once ABSPATH . 'wp-admin/includes/user.php';
+
 		// Hook: Before user hard deletion.
 		do_action( 'user_self_delete_before_deletion', $user_id, $user );
 
