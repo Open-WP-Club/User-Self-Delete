@@ -177,6 +177,7 @@ final class User_Self_Delete_Plugin {
 	 * Include required files.
 	 */
 	private function includes(): void {
+		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/retention-periods.php';
 		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/user-self-delete.php';
 		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/data-eraser.php';
 		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/admin-settings.php';
@@ -214,8 +215,11 @@ final class User_Self_Delete_Plugin {
 			);
 		}
 
-		// Create log table.
+		// Create log table and archive table.
 		$this->create_log_table();
+
+		// Migrate existing soft-deleted users to archive table.
+		$this->migrate_soft_deleted_users();
 
 		// Set default options.
 		$default_options = array(
@@ -258,10 +262,11 @@ final class User_Self_Delete_Plugin {
 	private function create_log_table(): void {
 		global $wpdb;
 
-		$table_name      = $wpdb->prefix . 'user_self_delete_log';
 		$charset_collate = $wpdb->get_charset_collate();
 
-		$sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
+		// Create log table.
+		$log_table = $wpdb->prefix . 'user_self_delete_log';
+		$log_sql = "CREATE TABLE IF NOT EXISTS {$log_table} (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			user_id bigint(20) unsigned NOT NULL,
 			user_email varchar(100) NOT NULL DEFAULT '',
@@ -275,11 +280,135 @@ final class User_Self_Delete_Plugin {
 			KEY status (status)
 		) {$charset_collate};";
 
+		// Create archive table for soft-deleted users.
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+		$archive_sql = "CREATE TABLE IF NOT EXISTS {$archive_table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			original_user_id bigint(20) unsigned NOT NULL,
+			original_email varchar(100) NOT NULL DEFAULT '',
+			user_login varchar(60) NOT NULL DEFAULT '',
+			user_nicename varchar(50) NOT NULL DEFAULT '',
+			display_name varchar(250) NOT NULL DEFAULT '',
+			deletion_date datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			scheduled_deletion_date datetime DEFAULT NULL,
+			retention_years int(11) NOT NULL DEFAULT 0,
+			retention_countries text,
+			ip_address varchar(45) NOT NULL DEFAULT '',
+			user_agent text,
+			user_data longtext,
+			PRIMARY KEY  (id),
+			KEY original_user_id (original_user_id),
+			KEY deletion_date (deletion_date),
+			KEY scheduled_deletion_date (scheduled_deletion_date),
+			KEY original_email (original_email)
+		) {$charset_collate};";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-		dbDelta( $sql );
+		dbDelta( $log_sql );
+		dbDelta( $archive_sql );
 
 		// Store database version.
 		update_option( 'user_self_delete_db_version', USER_SELF_DELETE_VERSION, true );
+	}
+
+	/**
+	 * Migrate existing soft-deleted users to archive table.
+	 *
+	 * This migrates users who were soft-deleted using the old method
+	 * (user meta flags) to the new archive table system.
+	 *
+	 * @since 2.0.0
+	 */
+	private function migrate_soft_deleted_users(): void {
+		// Check if migration has already run.
+		if ( get_option( 'user_self_delete_archive_migration_done', false ) ) {
+			return;
+		}
+
+		global $wpdb;
+
+		// Find users with old soft-delete meta flags.
+		$soft_deleted_users = $wpdb->get_col(
+			"SELECT user_id FROM {$wpdb->usermeta}
+			WHERE meta_key = 'user_self_delete_status'
+			AND meta_value = 'deleted'"
+		);
+
+		if ( empty( $soft_deleted_users ) ) {
+			// No users to migrate, mark as done.
+			update_option( 'user_self_delete_archive_migration_done', true, false );
+			return;
+		}
+
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+		$migrated = 0;
+
+		foreach ( $soft_deleted_users as $user_id ) {
+			// Get user object.
+			$user = get_userdata( $user_id );
+			if ( ! $user ) {
+				continue;
+			}
+
+			// Get deletion metadata.
+			$deletion_date     = get_user_meta( $user_id, 'user_self_delete_date', true ) ?: current_time( 'mysql' );
+			$scheduled_date    = get_user_meta( $user_id, 'user_self_delete_scheduled_for', true );
+			$retention_years   = (int) get_user_meta( $user_id, 'user_self_delete_retention_years', true );
+			$original_email    = get_user_meta( $user_id, 'user_self_delete_original_email', true );
+
+			// If no scheduled date, calculate it.
+			if ( ! $scheduled_date && $retention_years > 0 ) {
+				$scheduled_date = gmdate( 'Y-m-d H:i:s', strtotime( $deletion_date . " +{$retention_years} years" ) );
+			}
+
+			// Get selected countries from settings.
+			$selected_countries = get_option( 'user_self_delete_countries', array() );
+			$retention_countries = is_array( $selected_countries ) ? wp_json_encode( $selected_countries ) : '';
+
+			// Collect user meta.
+			$user_meta = get_user_meta( $user_id );
+			$user_data = wp_json_encode( array(
+				'meta'       => $user_meta,
+				'roles'      => $user->roles,
+				'caps'       => $user->caps,
+				'first_name' => $user->first_name,
+				'last_name'  => $user->last_name,
+			) );
+
+			// Insert into archive table.
+			$inserted = $wpdb->insert(
+				$archive_table,
+				array(
+					'original_user_id'       => $user_id,
+					'original_email'         => $original_email ?: $user->user_email,
+					'user_login'             => $user->user_login,
+					'user_nicename'          => $user->user_nicename,
+					'display_name'           => $user->display_name,
+					'deletion_date'          => $deletion_date,
+					'scheduled_deletion_date' => $scheduled_date,
+					'retention_years'        => $retention_years,
+					'retention_countries'    => $retention_countries,
+					'ip_address'             => '0.0.0.0', // Unknown for legacy data.
+					'user_agent'             => '',
+					'user_data'              => $user_data,
+				),
+				array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' )
+			);
+
+			if ( $inserted ) {
+				// Delete the user from wp_users.
+				wp_delete_user( $user_id );
+				$migrated++;
+			}
+		}
+
+		// Mark migration as complete.
+		update_option( 'user_self_delete_archive_migration_done', true, false );
+
+		// Log migration if enabled.
+		if ( get_option( 'user_self_delete_enable_logging', 1 ) && $migrated > 0 ) {
+			error_log( sprintf( 'User Self Delete: Migrated %d soft-deleted users to archive table.', $migrated ) );
+		}
 	}
 }
 

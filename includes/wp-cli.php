@@ -309,6 +309,123 @@ class User_Self_Delete_CLI {
 	}
 
 	/**
+	 * Cleanup expired soft-deleted users.
+	 *
+	 * Permanently removes users whose retention period has expired.
+	 * Users are soft-deleted immediately but kept for legal compliance
+	 * periods. This command removes users whose scheduled deletion date
+	 * has passed.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Show what would be deleted without actually deleting.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * [--limit=<number>]
+	 * : Maximum number of users to delete in one run.
+	 * ---
+	 * default: 100
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp user-self-delete cleanup --dry-run
+	 *     wp user-self-delete cleanup --yes
+	 *     wp user-self-delete cleanup --limit=50 --yes
+	 *
+	 * @when after_wp_load
+	 */
+	public function cleanup( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$limit   = (int) ( $assoc_args['limit'] ?? 100 );
+
+		// Find archived users with expired retention periods.
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+		$archived_users = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$archive_table}
+				WHERE scheduled_deletion_date <= %s
+				LIMIT %d",
+				gmdate( 'Y-m-d H:i:s' ),
+				$limit
+			)
+		);
+
+		if ( empty( $archived_users ) ) {
+			WP_CLI::success( 'No expired archived users found for cleanup.' );
+			return;
+		}
+
+		$count = count( $archived_users );
+
+		// Display users to be deleted.
+		if ( $dry_run || ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::log( sprintf( 'Found %d archived user(s) ready for cleanup:', $count ) );
+			WP_CLI::log( '' );
+
+			$users_info = array();
+			foreach ( $archived_users as $archived_user ) {
+				$users_info[] = array(
+					'user_id'        => $archived_user->original_user_id,
+					'original_email' => $archived_user->original_email,
+					'deleted_on'     => $archived_user->deletion_date,
+					'scheduled_for'  => $archived_user->scheduled_deletion_date,
+				);
+			}
+
+			WP_CLI\Utils\format_items( 'table', $users_info, array( 'user_id', 'original_email', 'deleted_on', 'scheduled_for' ) );
+		}
+
+		if ( $dry_run ) {
+			WP_CLI::warning( sprintf( 'Dry run complete. %d archived user(s) would be permanently deleted.', $count ) );
+			return;
+		}
+
+		// Confirm deletion.
+		WP_CLI::confirm(
+			sprintf( 'Are you sure you want to permanently delete %d archived user(s)?', $count ),
+			$assoc_args
+		);
+
+		// Perform cleanup using the data eraser.
+		$data_eraser = new User_Self_Delete_Data_Eraser();
+		$deleted     = 0;
+		$failed      = 0;
+
+		$progress = WP_CLI\Utils\make_progress_bar( 'Cleaning up archived users', $count );
+
+		foreach ( $archived_users as $archived_user ) {
+			// Force hard delete from archive (uses original_user_id).
+			$result = $data_eraser->delete_user_data( $archived_user->original_user_id, true );
+
+			if ( $result['success'] ) {
+				$deleted++;
+			} else {
+				$failed++;
+				WP_CLI::warning( sprintf( 'Failed to delete archived user %d: %s', $archived_user->original_user_id, $result['message'] ?? 'Unknown error' ) );
+			}
+
+			$progress->tick();
+		}
+
+		$progress->finish();
+
+		// Display results.
+		if ( $deleted > 0 ) {
+			WP_CLI::success( sprintf( 'Successfully deleted %d archived user(s).', $deleted ) );
+		}
+
+		if ( $failed > 0 ) {
+			WP_CLI::error( sprintf( '%d archived user(s) failed to delete.', $failed ) );
+		}
+	}
+
+	/**
 	 * View plugin settings.
 	 *
 	 * ## OPTIONS

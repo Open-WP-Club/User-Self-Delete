@@ -46,6 +46,16 @@ final class User_Self_Delete_Admin {
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'init_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_scripts' ) );
+
+		// Add custom column to users list.
+		add_filter( 'manage_users_columns', array( $this, 'add_deletion_status_column' ) );
+		add_filter( 'manage_users_custom_column', array( $this, 'render_deletion_status_column' ), 10, 3 );
+
+		// Add styles to user rows.
+		add_action( 'admin_footer-users.php', array( $this, 'add_user_list_styles' ) );
+
+		// Modify user display name in admin list.
+		add_filter( 'user_row_actions', array( $this, 'modify_deleted_user_actions' ), 10, 2 );
 	}
 
 	/**
@@ -88,6 +98,24 @@ final class User_Self_Delete_Admin {
 			'type'              => 'boolean',
 			'sanitize_callback' => 'rest_sanitize_boolean',
 			'default'           => false,
+		) );
+
+		register_setting( 'user_self_delete_settings', 'user_self_delete_countries', array(
+			'type'              => 'array',
+			'sanitize_callback' => array( $this, 'sanitize_countries' ),
+			'default'           => array(),
+		) );
+
+		register_setting( 'user_self_delete_settings', 'user_self_delete_use_custom_retention', array(
+			'type'              => 'boolean',
+			'sanitize_callback' => 'rest_sanitize_boolean',
+			'default'           => false,
+		) );
+
+		register_setting( 'user_self_delete_settings', 'user_self_delete_custom_retention_years', array(
+			'type'              => 'integer',
+			'sanitize_callback' => 'absint',
+			'default'           => 0,
 		) );
 
 		// General Settings Section.
@@ -173,6 +201,41 @@ final class User_Self_Delete_Admin {
 					'1' => __( 'Delete permanently', 'user-self-delete' ),
 				),
 				'description' => __( 'Choose what happens to posts created by users who delete their accounts.', 'user-self-delete' ),
+			)
+		);
+
+		// Data Retention Settings Section.
+		add_settings_section(
+			'user_self_delete_retention',
+			__( 'Data Retention Settings', 'user-self-delete' ),
+			array( $this, 'retention_section_callback' ),
+			'user_self_delete_settings'
+		);
+
+		// Country selection setting.
+		add_settings_field(
+			'retention_countries',
+			__( 'Countries Where You Sell', 'user-self-delete' ),
+			array( $this, 'countries_field_callback' ),
+			'user_self_delete_settings',
+			'user_self_delete_retention',
+			array(
+				'name'        => 'user_self_delete_countries',
+				'description' => __( 'Select all countries where you have customers. The system will automatically apply the maximum retention period required.', 'user-self-delete' ),
+			)
+		);
+
+		// Custom retention override.
+		add_settings_field(
+			'custom_retention',
+			__( 'Custom Retention Period', 'user-self-delete' ),
+			array( $this, 'custom_retention_field_callback' ),
+			'user_self_delete_settings',
+			'user_self_delete_retention',
+			array(
+				'name'        => 'user_self_delete_use_custom_retention',
+				'years_name'  => 'user_self_delete_custom_retention_years',
+				'description' => __( 'Override automatic calculation with a custom retention period. Useful for compliance with specific regulations.', 'user-self-delete' ),
 			)
 		);
 	}
@@ -309,6 +372,133 @@ final class User_Self_Delete_Admin {
 	}
 
 	/**
+	 * Retention section callback.
+	 */
+	public function retention_section_callback(): void {
+		echo '<p>' . esc_html__( 'Configure data retention periods for legal compliance. Select countries where you have customers to automatically calculate the required retention period based on tax and legal requirements.', 'user-self-delete' ) . '</p>';
+	}
+
+	/**
+	 * Countries field callback.
+	 *
+	 * @param array<string, mixed> $args Field arguments.
+	 */
+	public function countries_field_callback( array $args ): void {
+		$selected_countries = (array) get_option( $args['name'], array() );
+		$countries_by_region = User_Self_Delete_Retention_Periods::get_countries_by_region();
+
+		echo '<div class="user-self-delete-countries">';
+
+		foreach ( $countries_by_region as $region => $countries ) {
+			printf( '<h4>%s</h4>', esc_html( $region ) );
+			echo '<div class="country-group">';
+
+			foreach ( $countries as $code => $data ) {
+				$checked = in_array( $code, $selected_countries, true ) ? 'checked' : '';
+				printf(
+					'<label style="display: inline-block; width: 280px; margin-bottom: 5px;"><input type="checkbox" name="%s[]" value="%s" %s /> %s <em>(%d %s)</em></label>',
+					esc_attr( $args['name'] ),
+					esc_attr( $code ),
+					$checked,
+					esc_html( $data['name'] ),
+					$data['years'],
+					esc_html( _n( 'year', 'years', $data['years'], 'user-self-delete' ) )
+				);
+			}
+
+			echo '</div>';
+		}
+
+		echo '</div>';
+
+		// Display current retention period calculation.
+		if ( ! empty( $selected_countries ) ) {
+			$max_years = User_Self_Delete_Retention_Periods::calculate_max_retention( $selected_countries );
+			$max_countries = User_Self_Delete_Retention_Periods::get_max_retention_countries( $selected_countries );
+
+			if ( $max_years > 0 ) {
+				echo '<div class="notice notice-info inline" style="margin-top: 15px; padding: 10px;">';
+				printf(
+					'<p><strong>%s:</strong> %d %s</p>',
+					esc_html__( 'Current retention period', 'user-self-delete' ),
+					$max_years,
+					esc_html( _n( 'year', 'years', $max_years, 'user-self-delete' ) )
+				);
+
+				if ( ! empty( $max_countries ) ) {
+					printf(
+						'<p class="description">%s: %s</p>',
+						esc_html__( 'Defined by', 'user-self-delete' ),
+						esc_html( implode( ', ', $max_countries ) )
+					);
+				}
+				echo '</div>';
+			}
+		}
+
+		if ( isset( $args['description'] ) ) {
+			printf( '<p class="description">%s</p>', esc_html( $args['description'] ) );
+		}
+	}
+
+	/**
+	 * Custom retention field callback.
+	 *
+	 * @param array<string, mixed> $args Field arguments.
+	 */
+	public function custom_retention_field_callback( array $args ): void {
+		$use_custom = get_option( $args['name'], false );
+		$years      = get_option( $args['years_name'], 0 );
+		$checked    = checked( 1, $use_custom, false );
+
+		printf(
+			'<label><input type="checkbox" name="%s" value="1" %s /> %s</label><br>',
+			esc_attr( $args['name'] ),
+			$checked,
+			esc_html__( 'Use custom retention period instead of automatic calculation', 'user-self-delete' )
+		);
+
+		printf(
+			'<input type="number" name="%s" value="%d" min="0" max="99" style="width: 80px; margin-left: 20px;" /> %s',
+			esc_attr( $args['years_name'] ),
+			$years,
+			esc_html__( 'years', 'user-self-delete' )
+		);
+
+		if ( isset( $args['description'] ) ) {
+			printf( '<p class="description">%s</p>', esc_html( $args['description'] ) );
+		}
+
+		echo '<div class="notice notice-warning inline" style="margin-top: 10px; padding: 10px;">';
+		echo '<p><strong>' . esc_html__( 'Note:', 'user-self-delete' ) . '</strong> ';
+		echo esc_html__( 'Setting this to 0 years will immediately hard-delete user accounts with no retention period. Make sure this complies with your legal obligations.', 'user-self-delete' );
+		echo '</p></div>';
+	}
+
+	/**
+	 * Sanitize countries array.
+	 *
+	 * @param mixed $input Input value.
+	 * @return array<string> Sanitized country codes.
+	 */
+	public function sanitize_countries( mixed $input ): array {
+		if ( ! is_array( $input ) ) {
+			return array();
+		}
+
+		$valid_countries = array_keys( User_Self_Delete_Retention_Periods::get_countries() );
+		$sanitized = array();
+
+		foreach ( $input as $code ) {
+			if ( is_string( $code ) && in_array( $code, $valid_countries, true ) ) {
+				$sanitized[] = $code;
+			}
+		}
+
+		return array_unique( $sanitized );
+	}
+
+	/**
 	 * Display deletion statistics.
 	 */
 	private function display_deletion_stats(): void {
@@ -442,5 +632,101 @@ final class User_Self_Delete_Admin {
 			<p><?php echo esc_html__( 'This plugin helps meet GDPR requirements, but you should consult with legal counsel to ensure full compliance with applicable data protection laws in your jurisdiction.', 'user-self-delete' ); ?></p>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Add deletion status column to users list.
+	 *
+	 * @param array<string, string> $columns Existing columns.
+	 * @return array<string, string> Modified columns.
+	 */
+	public function add_deletion_status_column( array $columns ): array {
+		$columns['deletion_status'] = __( 'Status', 'user-self-delete' );
+		return $columns;
+	}
+
+	/**
+	 * Render deletion status column content.
+	 *
+	 * @param string $output      Custom column output.
+	 * @param string $column_name Column name.
+	 * @param int    $user_id     User ID.
+	 * @return string Column content.
+	 */
+	public function render_deletion_status_column( string $output, string $column_name, int $user_id ): string {
+		if ( 'deletion_status' !== $column_name ) {
+			return $output;
+		}
+
+		// Check if user is in archive table.
+		global $wpdb;
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+		$archived_user = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$archive_table} WHERE original_user_id = %d",
+				$user_id
+			)
+		);
+
+		if ( $archived_user ) {
+			$output = '<span class="user-deleted-badge" style="background: #dc3232; color: #fff; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600;">';
+			$output .= esc_html__( 'DELETED', 'user-self-delete' );
+			$output .= '</span>';
+
+			if ( $archived_user->scheduled_deletion_date ) {
+				$output .= '<br><small style="color: #999;">';
+				$output .= sprintf(
+					/* translators: %s: Date */
+					esc_html__( 'Removed on: %s', 'user-self-delete' ),
+					esc_html( gmdate( 'Y-m-d', strtotime( $archived_user->scheduled_deletion_date ) ) )
+				);
+				$output .= '</small>';
+			}
+		} else {
+			$output = '<span style="color: #46b450;">●</span> ' . esc_html__( 'Active', 'user-self-delete' );
+		}
+
+		return $output;
+	}
+
+	/**
+	 * Modify user row actions for deleted users.
+	 *
+	 * @param array<string, string> $actions Row actions.
+	 * @param WP_User              $user    User object.
+	 * @return array<string, string> Modified actions.
+	 */
+	public function modify_deleted_user_actions( array $actions, WP_User $user ): array {
+		global $wpdb;
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+
+		// Check if user is archived.
+		$is_archived = (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$archive_table} WHERE original_user_id = %d",
+				$user->ID
+			)
+		);
+
+		if ( $is_archived ) {
+			// Add info about deletion.
+			$actions['deleted_info'] = '<span style="color: #999;">' . esc_html__( 'Archived (no longer in system)', 'user-self-delete' ) . '</span>';
+
+			// Remove edit link for archived users.
+			unset( $actions['edit'] );
+		}
+
+		return $actions;
+	}
+
+	/**
+	 * Add styles for deleted users in the user list.
+	 *
+	 * Note: Archived users are no longer in wp_users table, so they won't appear
+	 * in the standard user list. This method is kept for legacy compatibility.
+	 */
+	public function add_user_list_styles(): void {
+		// Archived users are removed from wp_users and stored in archive table.
+		// They won't appear in the standard user list, so no styling needed.
 	}
 }

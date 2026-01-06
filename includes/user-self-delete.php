@@ -44,12 +44,23 @@ final class User_Self_Delete_Core {
 	 */
 	private function __construct() {
 		add_action( 'init', array( $this, 'init' ) );
+
+		// Schedule automatic cleanup cron job.
+		add_action( 'user_self_delete_cleanup', array( $this, 'run_automatic_cleanup' ) );
 	}
 
 	/**
 	 * Initialize.
 	 */
 	public function init(): void {
+		// Schedule daily cleanup if not already scheduled.
+		if ( ! wp_next_scheduled( 'user_self_delete_cleanup' ) ) {
+			wp_schedule_event( time(), 'daily', 'user_self_delete_cleanup' );
+		}
+
+		// Prevent soft-deleted users from logging in.
+		add_filter( 'wp_authenticate_user', array( $this, 'prevent_deleted_user_login' ), 10, 2 );
+
 		// Only load for logged-in users.
 		if ( ! is_user_logged_in() ) {
 			return;
@@ -70,6 +81,41 @@ final class User_Self_Delete_Core {
 			add_action( 'show_user_profile', array( $this, 'add_delete_button_to_profile' ) );
 			add_action( 'edit_user_profile', array( $this, 'add_delete_button_to_profile' ) );
 		}
+	}
+
+	/**
+	 * Prevent archived users from logging in.
+	 *
+	 * Note: Archived users are removed from wp_users table, so this is
+	 * primarily for edge cases during deletion process or if someone tries
+	 * to access a deleted account by ID.
+	 *
+	 * @param WP_User|WP_Error $user User object or error.
+	 * @param string           $password Password being used for login.
+	 * @return WP_User|WP_Error
+	 */
+	public function prevent_deleted_user_login( $user, string $password ) {
+		if ( $user instanceof WP_User ) {
+			global $wpdb;
+
+			// Check if user exists in archive table.
+			$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+			$is_archived = (bool) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$archive_table} WHERE original_user_id = %d",
+					$user->ID
+				)
+			);
+
+			if ( $is_archived ) {
+				return new WP_Error(
+					'deleted_user',
+					__( 'This account has been deleted and is no longer accessible.', 'user-self-delete' )
+				);
+			}
+		}
+
+		return $user;
 	}
 
 	/**
@@ -473,6 +519,50 @@ final class User_Self_Delete_Core {
 		}
 
 		return '0.0.0.0';
+	}
+
+	/**
+	 * Run automatic cleanup of expired archived users.
+	 *
+	 * This method is called by the daily cron job to silently cleanup
+	 * archived users whose retention period has expired.
+	 *
+	 * @since 2.0.0
+	 */
+	public function run_automatic_cleanup(): void {
+		global $wpdb;
+
+		// Find archived users with expired retention periods (limit 100 per run for safety).
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+		$archived_users = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$archive_table}
+				WHERE scheduled_deletion_date <= %s
+				LIMIT 100",
+				gmdate( 'Y-m-d H:i:s' )
+			)
+		);
+
+		// No expired archived users found, exit silently.
+		if ( empty( $archived_users ) ) {
+			return;
+		}
+
+		// Perform cleanup silently using the data eraser.
+		$data_eraser = new User_Self_Delete_Data_Eraser();
+
+		foreach ( $archived_users as $archived_user ) {
+			// Force hard delete from archive without any notifications.
+			$data_eraser->delete_user_data( $archived_user->original_user_id, true );
+		}
+
+		// Log cleanup run if logging is enabled.
+		if ( get_option( 'user_self_delete_enable_logging', 1 ) ) {
+			update_option( 'user_self_delete_last_cleanup', array(
+				'date'  => current_time( 'mysql' ),
+				'count' => count( $archived_users ),
+			), false );
+		}
 	}
 
 	/**

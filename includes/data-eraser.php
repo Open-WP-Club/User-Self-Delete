@@ -21,15 +21,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class User_Self_Delete_Data_Eraser {
 
 	/**
-	 * Delete user data.
+	 * Delete user data (soft or hard delete based on settings).
 	 *
-	 * @param int $user_id User ID to delete.
-	 * @return array{success: bool, message: string} Deletion result.
+	 * @param int  $user_id User ID to delete (or archive ID if from archive).
+	 * @param bool $force_hard_delete Force permanent deletion from archive (used by cleanup cron).
+	 * @return array{success: bool, message: string, scheduled_deletion?: string} Deletion result.
 	 */
-	public function delete_user_data( int $user_id ): array {
+	public function delete_user_data( int $user_id, bool $force_hard_delete = false ): array {
 		try {
-			// Get user data before deletion.
+			// Check if this is an archive deletion (user not in wp_users).
 			$user = get_user_by( 'ID', $user_id );
+
+			if ( ! $user instanceof WP_User && $force_hard_delete ) {
+				// This is an archive deletion - delete from archive table.
+				return $this->delete_from_archive( $user_id );
+			}
+
 			if ( ! $user instanceof WP_User ) {
 				return array(
 					'success' => false,
@@ -37,35 +44,17 @@ final class User_Self_Delete_Data_Eraser {
 				);
 			}
 
-			// Hook: Before user deletion.
-			do_action( 'user_self_delete_before_deletion', $user_id, $user );
+			// Determine deletion mode.
+			$retention_period = $this->get_retention_period();
+			$use_soft_delete  = ( $retention_period > 0 && ! $force_hard_delete );
 
-			// Handle WooCommerce data if present.
-			if ( class_exists( 'WooCommerce' ) ) {
-				$this->handle_woocommerce_data( $user_id );
+			if ( $use_soft_delete ) {
+				// Soft delete: move to archive table.
+				return $this->soft_delete_user( $user_id, $user, $retention_period );
+			} else {
+				// Hard delete: permanently remove user.
+				return $this->hard_delete_user( $user_id, $user );
 			}
-
-			// Handle other plugin data.
-			$this->handle_plugin_data( $user_id );
-
-			// Delete WordPress user data.
-			$this->delete_wordpress_data( $user_id );
-
-			// Delete the user account.
-			if ( ! wp_delete_user( $user_id ) ) {
-				return array(
-					'success' => false,
-					'message' => __( 'Failed to delete user account', 'user-self-delete' ),
-				);
-			}
-
-			// Hook: After user deletion.
-			do_action( 'user_self_delete_after_deletion', $user_id, $user );
-
-			return array(
-				'success' => true,
-				'message' => __( 'Account successfully deleted', 'user-self-delete' ),
-			);
 		} catch ( Exception $e ) {
 			error_log( 'User Self Delete Error: ' . $e->getMessage() );
 			return array(
@@ -73,6 +62,234 @@ final class User_Self_Delete_Data_Eraser {
 				'message' => __( 'An error occurred during account deletion', 'user-self-delete' ),
 			);
 		}
+	}
+
+	/**
+	 * Delete user from archive table (permanent removal).
+	 *
+	 * @param int $archive_id Archive table ID or original_user_id.
+	 * @return array{success: bool, message: string} Result.
+	 */
+	private function delete_from_archive( int $archive_id ): array {
+		global $wpdb;
+
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+
+		// Try deleting by ID or original_user_id.
+		$deleted = $wpdb->delete(
+			$archive_table,
+			array( 'original_user_id' => $archive_id ),
+			array( '%d' )
+		);
+
+		if ( false === $deleted || 0 === $deleted ) {
+			// Try by archive ID.
+			$deleted = $wpdb->delete(
+				$archive_table,
+				array( 'id' => $archive_id ),
+				array( '%d' )
+			);
+		}
+
+		if ( false === $deleted || 0 === $deleted ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Failed to delete archived user', 'user-self-delete' ),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'message' => __( 'Archived user permanently deleted', 'user-self-delete' ),
+		);
+	}
+
+	/**
+	 * Soft delete user (move to archive table, remove from wp_users).
+	 *
+	 * @param int     $user_id User ID.
+	 * @param WP_User $user    User object.
+	 * @param int     $retention_years Retention period in years.
+	 * @return array{success: bool, message: string, scheduled_deletion: string} Result.
+	 */
+	private function soft_delete_user( int $user_id, WP_User $user, int $retention_years ): array {
+		global $wpdb;
+
+		// Hook: Before user soft deletion.
+		do_action( 'user_self_delete_before_soft_deletion', $user_id, $user );
+
+		// Collect all user data before deletion.
+		$deletion_date     = current_time( 'mysql' );
+		$scheduled_date    = gmdate( 'Y-m-d H:i:s', strtotime( "+{$retention_years} years" ) );
+		$scheduled_display = gmdate( 'F j, Y', strtotime( "+{$retention_years} years" ) );
+
+		// Get selected countries.
+		$selected_countries = get_option( 'user_self_delete_countries', array() );
+		$retention_countries = is_array( $selected_countries ) ? wp_json_encode( $selected_countries ) : '';
+
+		// Collect user meta data.
+		$user_meta = get_user_meta( $user_id );
+		$user_data = wp_json_encode( array(
+			'meta'       => $user_meta,
+			'roles'      => $user->roles,
+			'caps'       => $user->caps,
+			'first_name' => $user->first_name,
+			'last_name'  => $user->last_name,
+		) );
+
+		// Get IP address.
+		$ip_address = $this->get_user_ip();
+		$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+
+		// Insert into archive table.
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+		$inserted = $wpdb->insert(
+			$archive_table,
+			array(
+				'original_user_id'       => $user_id,
+				'original_email'         => $user->user_email,
+				'user_login'             => $user->user_login,
+				'user_nicename'          => $user->user_nicename,
+				'display_name'           => $user->display_name,
+				'deletion_date'          => $deletion_date,
+				'scheduled_deletion_date' => $scheduled_date,
+				'retention_years'        => $retention_years,
+				'retention_countries'    => $retention_countries,
+				'ip_address'             => $ip_address,
+				'user_agent'             => $user_agent,
+				'user_data'              => $user_data,
+			),
+			array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' )
+		);
+
+		if ( false === $inserted ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Failed to archive user data', 'user-self-delete' ),
+			);
+		}
+
+		// Handle WooCommerce data (anonymize before deletion).
+		if ( class_exists( 'WooCommerce' ) ) {
+			$this->handle_woocommerce_data( $user_id );
+		}
+
+		// Handle other plugin data.
+		$this->handle_plugin_data( $user_id );
+
+		// Delete WordPress user data (posts, comments, etc).
+		$this->delete_wordpress_data( $user_id );
+
+		// Delete the user from wp_users.
+		if ( ! wp_delete_user( $user_id ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Failed to delete user account', 'user-self-delete' ),
+			);
+		}
+
+		// Hook: After user soft deletion.
+		do_action( 'user_self_delete_after_soft_deletion', $user_id, $user, $scheduled_date );
+
+		return array(
+			'success'            => true,
+			'message'            => __( 'Your account has been deleted. Data will be permanently removed in accordance with legal requirements.', 'user-self-delete' ),
+			'scheduled_deletion' => $scheduled_display,
+		);
+	}
+
+	/**
+	 * Hard delete user (permanent removal).
+	 *
+	 * @param int     $user_id User ID.
+	 * @param WP_User $user    User object.
+	 * @return array{success: bool, message: string} Result.
+	 */
+	private function hard_delete_user( int $user_id, WP_User $user ): array {
+		// Hook: Before user hard deletion.
+		do_action( 'user_self_delete_before_deletion', $user_id, $user );
+
+		// Handle WooCommerce data.
+		if ( class_exists( 'WooCommerce' ) ) {
+			$this->handle_woocommerce_data( $user_id );
+		}
+
+		// Handle other plugin data.
+		$this->handle_plugin_data( $user_id );
+
+		// Delete WordPress user data.
+		$this->delete_wordpress_data( $user_id );
+
+		// Delete the user account.
+		if ( ! wp_delete_user( $user_id ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Failed to delete user account', 'user-self-delete' ),
+			);
+		}
+
+		// Hook: After user hard deletion.
+		do_action( 'user_self_delete_after_deletion', $user_id, $user );
+
+		return array(
+			'success' => true,
+			'message' => __( 'Account successfully deleted', 'user-self-delete' ),
+		);
+	}
+
+	/**
+	 * Anonymize user data (for soft delete).
+	 *
+	 * @param int $user_id User ID.
+	 */
+	private function anonymize_user_data( int $user_id ): void {
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+
+		// Store original email for records.
+		update_user_meta( $user_id, 'user_self_delete_original_email', $user->user_email );
+
+		// Anonymize user data.
+		$anon_email = 'deleted_' . $user_id . '@deleted.local';
+
+		wp_update_user(
+			array(
+				'ID'           => $user_id,
+				'user_email'   => $anon_email,
+				'display_name' => 'Deleted User',
+				'first_name'   => '',
+				'last_name'    => '',
+				'description'  => '',
+			)
+		);
+
+		// Delete WordPress user data (posts, comments, meta).
+		$this->delete_wordpress_data( $user_id );
+	}
+
+	/**
+	 * Get retention period from settings.
+	 *
+	 * @return int Retention period in years (0 = immediate hard delete).
+	 */
+	private function get_retention_period(): int {
+		// Check for custom override.
+		$use_custom = (bool) get_option( 'user_self_delete_use_custom_retention', false );
+
+		if ( $use_custom ) {
+			return (int) get_option( 'user_self_delete_custom_retention_years', 0 );
+		}
+
+		// Calculate from selected countries.
+		$selected_countries = get_option( 'user_self_delete_countries', array() );
+
+		if ( empty( $selected_countries ) || ! is_array( $selected_countries ) ) {
+			return 0; // No retention if no countries selected.
+		}
+
+		return User_Self_Delete_Retention_Periods::calculate_max_retention( $selected_countries );
 	}
 
 	/**
@@ -477,5 +694,26 @@ final class User_Self_Delete_Data_Eraser {
 		}
 
 		return $summary;
+	}
+
+	/**
+	 * Get user IP address.
+	 *
+	 * @return string User IP address.
+	 */
+	private function get_user_ip(): string {
+		$ip_keys = array( 'HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' );
+
+		foreach ( $ip_keys as $key ) {
+			if ( ! empty( $_SERVER[ $key ] ) ) {
+				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
+				// Validate IP address.
+				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+					return $ip;
+				}
+			}
+		}
+
+		return '0.0.0.0';
 	}
 }
