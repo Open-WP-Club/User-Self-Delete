@@ -10,8 +10,8 @@
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: user-self-delete
  * Domain Path: /languages
- * Requires at least: 6.0
- * Requires PHP: 7.4
+ * Requires at least: 6.4
+ * Requires PHP: 8.2
  * WC requires at least: 7.0
  * WC tested up to: 9.5
  *
@@ -31,8 +31,8 @@ define( 'USER_SELF_DELETE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'USER_SELF_DELETE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'USER_SELF_DELETE_PLUGIN_FILE', __FILE__ );
 define( 'USER_SELF_DELETE_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
-define( 'USER_SELF_DELETE_MIN_PHP', '7.4' );
-define( 'USER_SELF_DELETE_MIN_WP', '6.0' );
+define( 'USER_SELF_DELETE_MIN_PHP', '8.2' );
+define( 'USER_SELF_DELETE_MIN_WP', '6.4' );
 
 /**
  * Main plugin class.
@@ -177,9 +177,14 @@ final class User_Self_Delete_Plugin {
 	 * Include required files.
 	 */
 	private function includes(): void {
-		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/class-user-self-delete.php';
-		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/class-data-eraser.php';
-		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/class-admin-settings.php';
+		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/user-self-delete.php';
+		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/data-eraser.php';
+		require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/admin-settings.php';
+
+		// Load WP-CLI commands if available.
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			require_once USER_SELF_DELETE_PLUGIN_DIR . 'includes/wp-cli.php';
+		}
 	}
 
 	/**
