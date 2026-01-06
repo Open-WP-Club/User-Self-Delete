@@ -1,4 +1,4 @@
-# User Self Delete
+# User Self Delete for WordPress
 
 GDPR-compliant WordPress plugin for user self-deletion with country-based data retention periods for legal and tax compliance.
 

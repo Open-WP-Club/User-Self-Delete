@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: User Self Delete
+ * Plugin Name: User Self Delete for WordPress
  * Plugin URI: https://github.com/Open-WP-Club/User-Self-Delete
  * Description: GDPR-compliant user self-delete functionality for WordPress/WooCommerce with modern security and performance features
  * Version: 2.0.0
