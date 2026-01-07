@@ -1,170 +1,281 @@
-# User Self Delete
+# User Self Delete for WordPress
 
-A GDPR-compliant WordPress plugin that allows users to easily delete their own accounts without unnecessary barriers, meeting Article 17 (Right to Erasure) requirements.
+GDPR-compliant WordPress plugin for user self-deletion with country-based data retention periods for legal and tax compliance.
 
 ## Features
 
-### 🚀 Core Functionality
+### 🌍 Smart Data Retention
+- **Country-Based Retention**: Select countries where you do business
+- **Automatic Calculation**: Plugin calculates maximum required retention period
+- **Soft Delete System**: Users archived immediately, permanently deleted after retention period
+- **Archive Table**: Deleted users stored separately for optimal performance
 
-- **Direct Account Deletion**: Users can delete their accounts directly from their dashboard
-- **GDPR Compliant**: Meets Article 17 requirements with minimal barriers
-- **Security**: Password confirmation required for account deletion
-- **WooCommerce Integration**: Handles e-commerce data appropriately
+### 🛡️ GDPR Compliance
+- **Article 17 Right to Erasure**: Users can delete accounts with minimal barriers
+- **Legal Compliance**: Balances GDPR with tax/accounting retention requirements
+- **Audit Trail**: Complete logging of all deletion activities
+- **Data Anonymization**: WooCommerce orders anonymized while preserving business records
 
-### 🛡️ Security & Privacy
+### ⚡ Performance Optimized
+- Deleted users moved to separate archive table
+- WordPress doesn't load archived users in queries
+- Automatic daily cleanup via cron
+- WP-CLI commands for manual management
 
-- **Password Verification**: Users must confirm their password before deletion
-- **Audit Logging**: Optional logging of all deletion requests
-- **Admin Notifications**: Optional email notifications to administrators
-- **Data Anonymization**: WooCommerce orders can be anonymized instead of deleted
+### 🔧 Technical Features
+- **Modern Stack**: PHP 8.2+, WordPress 6.4+
+- **WooCommerce HPOS**: Compatible with High-Performance Order Storage
+- **REST API**: Modern endpoint for account deletion
+- **Vanilla JavaScript**: No jQuery dependency
+- **Simplified UX**: Single-step password confirmation, integrated account details placement
+- **Security Hardened**: Admin deletion prevention, IP validation, XSS-safe, clear error messaging
 
-### 📊 Data Handling
+## Requirements
 
-- **Complete Erasure**: Removes all user data and metadata
-- **WooCommerce Orders**: Choice between anonymization or complete deletion
-- **User Posts**: Can be reassigned to admin or deleted
-- **Plugin Integration**: Supports common plugins (BuddyPress, bbPress, Ultimate Member)
-
-### ⚙️ Admin Features
-
-- **Settings Panel**: Configure deletion behavior and notifications
-- **Deletion Statistics**: View deletion trends and statistics
-- **Compliance Dashboard**: GDPR compliance information and guidelines
+- **PHP**: 8.2 or higher
+- **WordPress**: 6.4 or higher
+- **WooCommerce**: 7.0+ (optional)
 
 ## Installation
 
-### Manual Installation
+1. Upload plugin to `/wp-content/plugins/user-self-delete/`
+2. Activate through WordPress admin
+3. Go to **Settings > User Self Delete**
+4. Select countries where you have customers
+5. Configure retention and deletion preferences
 
-1. Download the plugin files
-2. Upload the `user-self-delete` folder to `/wp-content/plugins/`
-3. Activate the plugin through the WordPress admin
-4. Configure settings in **Settings > User Self Delete**
+## Configuration
 
-### Configuration
+### Data Retention Settings
 
-Navigate to **Settings > User Self Delete** to configure:
+**Countries Where You Sell**
+- Select all countries where you have customers
+- Plugin automatically applies maximum retention period required
+- Examples: Germany (10 years), UK (6 years), Bulgaria (5 years)
 
-- **Enable Logging**: Track deletion requests for audit purposes
-- **Admin Notifications**: Receive email when users delete accounts
-- **Order Handling**: Choose to anonymize or delete WooCommerce orders
-- **Post Handling**: Reassign user posts to admin or delete them
+**Custom Retention Override**
+- Optionally set custom retention period
+- Useful for specific regulations or business requirements
+
+### General Settings
+
+- **Enable Logging**: Track deletions for audit (recommended)
+- **Admin Notifications**: Email notifications for deletions
+- **Order Handling**: Anonymize (recommended) or delete WooCommerce orders
+- **Post Handling**: Reassign to admin or delete user posts
 
 ## Usage
 
 ### For Users
 
-1. **WooCommerce Sites**: Go to **My Account > Dashboard**
-2. **Standard WordPress**: Available in user profile
+**WooCommerce Sites:**
+1. Go to **My Account > Account Details**
+2. Scroll to the **"Delete Account"** section
 3. Click **"Delete My Account"** button
-4. Review what data will be deleted
-5. Enter password to confirm
-6. Confirm deletion in the popup
+4. Enter your password in the confirmation modal
+5. Click **"Delete My Account"** to confirm
+6. Account deleted immediately, data archived per retention period
+
+**Standard WordPress:**
+- Available in user profile page
+- Same streamlined deletion process
+
+**Simplified Interface:**
+- Single password confirmation step
+- Clear error messages (e.g., admins cannot self-delete)
+- No redundant warning prompts
+- Clean, integrated design
 
 ### For Administrators
 
-- Monitor deletion activity in the admin dashboard
-- Configure data handling preferences
-- Review GDPR compliance information
-- Export deletion logs for auditing
+**View Deletion Statistics:**
+- Go to **Settings > User Self Delete**
+- View total deletions, monthly stats, recent activity
 
-## GDPR Compliance
+**Manage Archived Users:**
+```bash
+# View expired archived users (dry run)
+wp user-self-delete cleanup --dry-run
 
-### Article 17 - Right to Erasure
+# Cleanup expired users
+wp user-self-delete cleanup --yes
 
-✅ **Easy Access**: Delete button prominently displayed in user dashboard  
-✅ **No Unnecessary Barriers**: Only password confirmation required  
-✅ **Complete Erasure**: All personal data removed  
-✅ **Audit Trail**: Deletion requests logged for compliance  
+# View deletion statistics
+wp user-self-delete stats
 
-### Data Processing
+# View recent deletion log
+wp user-self-delete log --limit=20
 
-- **Personal Data**: Completely removed from all WordPress tables
-- **Order Data**: Anonymized to maintain legal/tax compliance
-- **Content**: User posts can be reassigned or deleted based on settings
-- **Third-party Data**: Hooks provided for other plugins to clean up
+# Export deletion log
+wp user-self-delete export deletions-2024.csv
+```
 
-### Legal Basis Preservation
+## How It Works
 
-- WooCommerce orders can be anonymized instead of deleted
-- Maintains transaction records for tax and legal compliance
-- Removes all personally identifiable information
+### Soft Delete Process
 
-## Technical Details
+1. **User Requests Deletion**
+   - Enters password to confirm
+   - All personal data archived
 
-### What Gets Deleted
+2. **Immediate Anonymization**
+   - User removed from wp_users table
+   - Data moved to archive table
+   - WooCommerce orders anonymized
+   - Login prevented
 
-- User account and profile information
-- All user metadata
-- Personal comments
-- WooCommerce customer data (addresses, payment info)
-- Integration data from supported plugins
+3. **Scheduled Permanent Deletion**
+   - Based on country retention requirements
+   - Automatic cleanup via daily cron
+   - Manual cleanup via WP-CLI
 
-### Database Changes
+### Archive Table
 
-- Creates logging table: `wp_user_self_delete_log`
-- Removes user data from all relevant WordPress tables
-- Anonymizes or removes WooCommerce data based on settings
+Deleted users stored in `wp_user_self_delete_archive`:
+- Original user data preserved for audit
+- Scheduled deletion date tracked
+- Retention periods recorded
+- IP address and timestamp logged
 
-### Hooks & Filters
+## Database Tables
+
+- `wp_user_self_delete_log` - Deletion activity log
+- `wp_user_self_delete_archive` - Soft-deleted users archive
+
+## REST API
+
+**Delete Account Endpoint:**
+```
+POST /wp-json/user-self-delete/v1/delete-account
+Authorization: Bearer [nonce]
+Body: { "password": "user_password" }
+```
+
+**Account Info Endpoint:**
+```
+GET /wp-json/user-self-delete/v1/account-info
+Authorization: Bearer [nonce]
+```
+
+## WP-CLI Commands
+
+```bash
+# Statistics
+wp user-self-delete stats
+wp user-self-delete stats --format=json
+
+# Deletion log
+wp user-self-delete log
+wp user-self-delete log --limit=50 --format=csv
+
+# Cleanup expired users
+wp user-self-delete cleanup --dry-run
+wp user-self-delete cleanup --yes --limit=100
+
+# Export log
+wp user-self-delete export
+wp user-self-delete export --start-date=2024-01-01
+
+# View settings
+wp user-self-delete settings
+```
+
+## Hooks & Filters
 
 ```php
-// Before user deletion
+// Before soft deletion
+do_action('user_self_delete_before_soft_deletion', $user_id, $user);
+
+// After soft deletion
+do_action('user_self_delete_after_soft_deletion', $user_id, $user, $scheduled_date);
+
+// Before permanent deletion
 do_action('user_self_delete_before_deletion', $user_id, $user);
 
-// After user deletion
+// After permanent deletion
 do_action('user_self_delete_after_deletion', $user_id, $user);
 
 // Plugin data cleanup
 do_action('user_self_delete_cleanup_plugin_data', $user_id);
 ```
 
-## Plugin Compatibility
+## Supported Plugins
 
-### Fully Supported
+- **WooCommerce**: Full HPOS compatibility
+- **BuddyPress**: Activity and profile cleanup
+- **bbPress**: Forum data handling
+- **Ultimate Member**: Profile data removal
 
-- **WooCommerce**: Complete integration with order handling
-- **BuddyPress**: Activity and profile data removal
-- **bbPress**: Forum posts and replies handling
-- **Ultimate Member**: Profile and metadata cleanup
+## Retention Periods by Country
 
-### Extensible
+The plugin includes retention periods for 40+ countries:
 
-- Hooks provided for other plugins to integrate
-- Can be extended to support additional plugins
-- Compatible with most WordPress setups
+**EU Examples:**
+- Germany, France, Italy: 10 years
+- Austria, Belgium, Netherlands: 7 years
+- Denmark, Bulgaria: 5 years
 
-## Requirements
+**Other Regions:**
+- United States: 7 years
+- United Kingdom: 6 years
+- Canada: 6 years
+- Australia: 5 years
 
-- **WordPress**: 5.0 or higher
-- **PHP**: 7.4 or higher
-- **WooCommerce**: 4.0+ (optional, for e-commerce features)
+View full list in admin settings.
 
-## Security Considerations
+### Adding New Countries
 
-- Users must enter their current password to delete account
-- All deletion attempts are logged with IP addresses
-- Admin notifications help monitor account deletions
-- Hooks allow additional security measures
+To add a new country to the plugin:
+
+1. Open `includes/retention-periods.php`
+2. Find the `get_countries()` method (around line 49)
+3. Add your country entry following this format:
+
+```php
+'XX' => array(
+    'name'   => 'Country Name',
+    'years'  => 7,  // Retention period in years
+    'region' => 'Region Name',
+),
+```
+
+**Example:**
+```php
+'FR' => array(
+    'name'   => 'France',
+    'years'  => 10,
+    'region' => 'EU',
+),
+```
+
+**Available regions:** EU, EEA, UK, Europe, North America, South America, Asia, Oceania, Middle East, Africa
+
+The retention period should reflect the longest legal requirement for keeping business/tax records in that country.
+
+## Security Features
+
+- Password verification required for all deletions
+- Admin accounts cannot self-delete (with clear error message)
+- IP address logging for audit trail
+- XSS-safe DOM manipulation
+- Proper nonce verification (REST API and AJAX)
+- SQL injection prevention
+- Descriptive error messages for better user experience
+
+## Migration
+
+Plugin automatically migrates existing soft-deleted users to archive table on activation. This is a one-time operation.
 
 ## Legal Disclaimer
 
-This plugin helps meet GDPR requirements but does not guarantee full legal compliance. Consult with legal counsel to ensure compliance with applicable data protection laws in your jurisdiction.
+This plugin helps meet GDPR and data retention requirements but does not guarantee full legal compliance. Consult legal counsel for your specific jurisdiction and business requirements.
 
 ## Support
 
-For support, feature requests, or bug reports, please use the plugin support forum or contact the developer.
-
-## Changelog
-
-### Version 1.0.0
-
-- Initial release
-- GDPR-compliant account deletion
-- WooCommerce integration
-- Admin settings panel
-- Audit logging
-- Multi-plugin support
+For issues, feature requests, or contributions:
+- GitHub: https://github.com/Open-WP-Club/User-Self-Delete
+- Report bugs via GitHub Issues
 
 ## License
 
-GPL v2 or later - same as WordPress core.
+GPL v2 or later
