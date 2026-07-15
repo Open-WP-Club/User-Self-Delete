@@ -25,6 +25,7 @@ GDPR-compliant WordPress plugin for user self-deletion with country-based data r
 ### 🔧 Technical Features
 - **Modern Stack**: PHP 8.2+, WordPress 6.4+
 - **WooCommerce HPOS**: Compatible with High-Performance Order Storage
+- **WooCommerce Blocks**: Works with both classic and Blocks-based My Account pages
 - **REST API**: Modern endpoint for account deletion
 - **Vanilla JavaScript**: No jQuery dependency
 - **Simplified UX**: Single-step password confirmation, integrated account details placement
@@ -33,8 +34,8 @@ GDPR-compliant WordPress plugin for user self-deletion with country-based data r
 ## Requirements
 
 - **PHP**: 8.2 or higher
-- **WordPress**: 6.4 or higher
-- **WooCommerce**: 7.0+ (optional)
+- **WordPress**: 6.4 or higher (tested up to 6.8)
+- **WooCommerce**: 7.0+ (optional, tested up to 9.9)
 
 ## Installation
 
@@ -109,6 +110,12 @@ wp user-self-delete log --limit=20
 # Export deletion log
 wp user-self-delete export deletions-2024.csv
 ```
+
+**View Archived Users:**
+- Go to **Settings > User Self Delete**
+- Scroll to the **"Archived Users"** section
+- Shows all soft-deleted users with deletion date and scheduled permanent removal date
+- Paginated at 20 users per page
 
 ## How It Works
 
