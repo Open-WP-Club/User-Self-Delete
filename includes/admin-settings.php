@@ -759,7 +759,12 @@ final class User_Self_Delete_Admin {
 
 			echo '<tr>';
 			printf( '<td>%s</td>', esc_html( $row->original_email ) );
-			printf( '<td>%s</td>', esc_html( gmdate( 'Y-m-d', strtotime( $row->deletion_date ) ) ) );
+			printf(
+				'<td>%s</td>',
+				$row->deletion_date
+					? esc_html( gmdate( 'Y-m-d', strtotime( $row->deletion_date ) ) )
+					: '&mdash;'
+			);
 			printf( '<td>%s</td>', $permanent ); // Already escaped above.
 			printf(
 				'<td>%d %s</td>',
@@ -775,13 +780,13 @@ final class User_Self_Delete_Admin {
 		$total_pages = (int) ceil( $total / $per_page );
 		if ( $total_pages > 1 ) {
 			$base_url = admin_url( 'options-general.php?page=user-self-delete' );
-			echo '<div class="tablenav bottom"><div class="tablenav-pages" style="margin: 10px 0;">';
+			echo '<div class="tablenav bottom"><div class="tablenav-pages usd-archived-pagination">';
 			for ( $i = 1; $i <= $total_pages; $i++ ) {
 				if ( $i === $current_page ) {
-					printf( '<span class="button button-disabled" style="margin-right:4px;">%d</span>', $i );
+					printf( '<span class="button button-disabled usd-page-btn">%d</span>', $i );
 				} else {
 					printf(
-						'<a class="button" href="%s" style="margin-right:4px;">%d</a>',
+						'<a class="button usd-page-btn" href="%s">%d</a>',
 						esc_url( add_query_arg( 'archived_paged', $i, $base_url ) ),
 						$i
 					);

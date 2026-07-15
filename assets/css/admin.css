@@ -171,6 +171,15 @@
   font-size: 14px;
 }
 
+/* Archived users pagination */
+.usd-archived-pagination {
+    margin: 10px 0;
+}
+
+.usd-page-btn {
+    margin-right: 4px;
+}
+
 /* Responsive adjustments */
 @media (max-width: 782px) {
 
