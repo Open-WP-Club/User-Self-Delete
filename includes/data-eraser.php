@@ -244,38 +244,6 @@ final class User_Self_Delete_Data_Eraser {
 	}
 
 	/**
-	 * Anonymize user data (for soft delete).
-	 *
-	 * @param int $user_id User ID.
-	 */
-	private function anonymize_user_data( int $user_id ): void {
-		$user = get_userdata( $user_id );
-		if ( ! $user ) {
-			return;
-		}
-
-		// Store original email for records.
-		update_user_meta( $user_id, 'user_self_delete_original_email', $user->user_email );
-
-		// Anonymize user data.
-		$anon_email = 'deleted_' . $user_id . '@deleted.local';
-
-		wp_update_user(
-			array(
-				'ID'           => $user_id,
-				'user_email'   => $anon_email,
-				'display_name' => 'Deleted User',
-				'first_name'   => '',
-				'last_name'    => '',
-				'description'  => '',
-			)
-		);
-
-		// Delete WordPress user data (posts, comments, meta).
-		$this->delete_wordpress_data( $user_id );
-	}
-
-	/**
 	 * Get retention period from settings.
 	 *
 	 * @return int Retention period in years (0 = immediate hard delete).
