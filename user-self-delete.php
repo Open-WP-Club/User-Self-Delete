@@ -3,7 +3,7 @@
  * Plugin Name: User Self Delete for WordPress
  * Plugin URI: https://github.com/Open-WP-Club/User-Self-Delete
  * Description: GDPR-compliant user self-delete functionality for WordPress/WooCommerce with modern security and performance features
- * Version: 2.0.0
+ * Version: 2.1.0
  * Author: Open WP Club
  * Author URI: https://github.com/Open-WP-Club
  * License: GPL v2 or later
@@ -12,8 +12,9 @@
  * Domain Path: /languages
  * Requires at least: 6.4
  * Requires PHP: 8.2
+ * Tested up to: 6.8
  * WC requires at least: 7.0
- * WC tested up to: 9.5
+ * WC tested up to: 9.9
  *
  * @package UserSelfDelete
  */
@@ -26,7 +27,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants.
-define( 'USER_SELF_DELETE_VERSION', '2.0.0' );
+define( 'USER_SELF_DELETE_VERSION', '2.1.0' );
 define( 'USER_SELF_DELETE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'USER_SELF_DELETE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'USER_SELF_DELETE_PLUGIN_FILE', __FILE__ );
@@ -223,13 +224,10 @@ final class User_Self_Delete_Plugin {
 
 		// Set default options.
 		$default_options = array(
-			'enable_logging'       => 1,
-			'admin_notification'   => 1,
-			'anonymize_orders'     => 1,
-			'delete_posts'         => 0,
-			'require_password'     => 1,
-			'deletion_cooldown'    => 0,
-			'cooldown_period'      => 24,
+			'enable_logging'     => 1,
+			'admin_notification' => 1,
+			'anonymize_orders'   => 1,
+			'delete_posts'       => 0,
 		);
 
 		foreach ( $default_options as $key => $value ) {
