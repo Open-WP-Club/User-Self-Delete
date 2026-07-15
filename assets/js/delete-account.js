@@ -162,14 +162,13 @@ class UserSelfDelete {
 		this.modal.style.opacity = '0';
 		setTimeout( () => {
 			this.modal.style.display = 'none';
+			if ( this.deleteButton ) {
+				this.deleteButton.setAttribute( 'aria-expanded', 'false' );
+				this.deleteButton.focus();
+			}
 		}, 300 );
 
 		document.body.classList.remove( 'modal-open' );
-
-		if ( this.deleteButton ) {
-			this.deleteButton.setAttribute( 'aria-expanded', 'false' );
-			this.deleteButton.focus();
-		}
 
 		// Clear any error messages.
 		if ( this.passwordError ) {
@@ -199,6 +198,7 @@ class UserSelfDelete {
 	 * @param {KeyboardEvent} e
 	 */
 	trapFocus( e ) {
+		if ( ! this.isModalVisible() ) return;
 		if ( e.key !== 'Tab' ) return;
 
 		const focusable = Array.from(
