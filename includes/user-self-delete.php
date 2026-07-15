@@ -58,9 +58,6 @@ final class User_Self_Delete_Core {
 			wp_schedule_event( time(), 'daily', 'user_self_delete_cleanup' );
 		}
 
-		// Prevent soft-deleted users from logging in.
-		add_filter( 'wp_authenticate_user', array( $this, 'prevent_deleted_user_login' ), 10, 2 );
-
 		// Only load for logged-in users.
 		if ( ! is_user_logged_in() ) {
 			return;
@@ -81,41 +78,6 @@ final class User_Self_Delete_Core {
 			add_action( 'show_user_profile', array( $this, 'add_delete_button_to_profile' ) );
 			add_action( 'edit_user_profile', array( $this, 'add_delete_button_to_profile' ) );
 		}
-	}
-
-	/**
-	 * Prevent archived users from logging in.
-	 *
-	 * Note: Archived users are removed from wp_users table, so this is
-	 * primarily for edge cases during deletion process or if someone tries
-	 * to access a deleted account by ID.
-	 *
-	 * @param WP_User|WP_Error $user User object or error.
-	 * @param string           $password Password being used for login.
-	 * @return WP_User|WP_Error
-	 */
-	public function prevent_deleted_user_login( $user, string $password ) {
-		if ( $user instanceof WP_User ) {
-			global $wpdb;
-
-			// Check if user exists in archive table.
-			$archive_table = $wpdb->prefix . 'user_self_delete_archive';
-			$is_archived = (bool) $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT COUNT(*) FROM {$archive_table} WHERE original_user_id = %d",
-					$user->ID
-				)
-			);
-
-			if ( $is_archived ) {
-				return new WP_Error(
-					'deleted_user',
-					__( 'This account has been deleted and is no longer accessible.', 'user-self-delete' )
-				);
-			}
-		}
-
-		return $user;
 	}
 
 	/**
