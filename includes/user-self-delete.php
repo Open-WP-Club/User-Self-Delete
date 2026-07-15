@@ -295,7 +295,7 @@ final class User_Self_Delete_Core {
 		echo '<div class="user-delete-info">';
 		echo '<p>' . esc_html__( 'If you no longer wish to use this account, you can permanently delete it along with all associated data.', 'user-self-delete' ) . '</p>';
 
-		echo '<button type="button" class="button delete-account-btn" id="delete-account-trigger">';
+		echo '<button type="button" class="button delete-account-btn" id="delete-account-trigger" aria-expanded="false" aria-controls="delete-account-modal">';
 		echo esc_html__( 'Delete My Account', 'user-self-delete' );
 		echo '</button>';
 
@@ -314,10 +314,10 @@ final class User_Self_Delete_Core {
 	 */
 	private function render_confirmation_modal(): void {
 		?>
-		<div id="delete-account-modal" class="user-delete-modal" style="display: none;">
+		<div id="delete-account-modal" class="user-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-modal-title" style="display: none;">
 			<div class="modal-content">
 				<div class="modal-header">
-					<h3><?php echo esc_html__( 'Delete Account', 'user-self-delete' ); ?></h3>
+					<h3 id="delete-account-modal-title"><?php echo esc_html__( 'Delete Account', 'user-self-delete' ); ?></h3>
 					<span class="close-modal">&times;</span>
 				</div>
 				<div class="modal-body">

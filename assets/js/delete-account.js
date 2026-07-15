@@ -81,6 +81,9 @@ class UserSelfDelete {
 			e.stopPropagation();
 		} );
 
+		// Focus trap.
+		this.modal.addEventListener( 'keydown', ( e ) => this.trapFocus( e ) );
+
 		// Handle escape key.
 		document.addEventListener( 'keydown', ( e ) => {
 			if ( e.key === 'Escape' && this.isModalVisible() ) {
@@ -137,6 +140,10 @@ class UserSelfDelete {
 
 		// Prevent body scroll.
 		document.body.classList.add( 'modal-open' );
+
+		if ( this.deleteButton ) {
+			this.deleteButton.setAttribute( 'aria-expanded', 'true' );
+		}
 	}
 
 	/**
@@ -159,6 +166,11 @@ class UserSelfDelete {
 
 		document.body.classList.remove( 'modal-open' );
 
+		if ( this.deleteButton ) {
+			this.deleteButton.setAttribute( 'aria-expanded', 'false' );
+			this.deleteButton.focus();
+		}
+
 		// Clear any error messages.
 		if ( this.passwordError ) {
 			this.passwordError.style.display = 'none';
@@ -178,6 +190,36 @@ class UserSelfDelete {
 		// Hide any previous error messages.
 		if ( this.passwordError ) {
 			this.passwordError.style.display = 'none';
+		}
+	}
+
+	/**
+	 * Trap keyboard focus inside the modal.
+	 *
+	 * @param {KeyboardEvent} e
+	 */
+	trapFocus( e ) {
+		if ( e.key !== 'Tab' ) return;
+
+		const focusable = Array.from(
+			this.modal.querySelectorAll( 'button:not([disabled]), input:not([disabled])' )
+		);
+
+		if ( focusable.length === 0 ) return;
+
+		const first = focusable[ 0 ];
+		const last  = focusable[ focusable.length - 1 ];
+
+		if ( e.shiftKey ) {
+			if ( document.activeElement === first ) {
+				e.preventDefault();
+				last.focus();
+			}
+		} else {
+			if ( document.activeElement === last ) {
+				e.preventDefault();
+				first.focus();
+			}
 		}
 	}
 
