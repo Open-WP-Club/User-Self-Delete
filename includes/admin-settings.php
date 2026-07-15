@@ -54,12 +54,6 @@ final class User_Self_Delete_Admin {
 		// Add custom column to users list.
 		add_filter( 'manage_users_columns', array( $this, 'add_deletion_status_column' ) );
 		add_filter( 'manage_users_custom_column', array( $this, 'render_deletion_status_column' ), 10, 3 );
-
-		// Add styles to user rows.
-		add_action( 'admin_footer-users.php', array( $this, 'add_user_list_styles' ) );
-
-		// Modify user display name in admin list.
-		add_filter( 'user_row_actions', array( $this, 'modify_deleted_user_actions' ), 10, 2 );
 	}
 
 	/**
@@ -791,44 +785,4 @@ final class User_Self_Delete_Admin {
 		return $output;
 	}
 
-	/**
-	 * Modify user row actions for deleted users.
-	 *
-	 * @param array<string, string> $actions Row actions.
-	 * @param WP_User              $user    User object.
-	 * @return array<string, string> Modified actions.
-	 */
-	public function modify_deleted_user_actions( array $actions, WP_User $user ): array {
-		global $wpdb;
-		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
-
-		// Check if user is archived.
-		$is_archived = (bool) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$archive_table} WHERE original_user_id = %d",
-				$user->ID
-			)
-		);
-
-		if ( $is_archived ) {
-			// Add info about deletion.
-			$actions['deleted_info'] = '<span style="color: #999;">' . esc_html__( 'Archived (no longer in system)', 'user-self-delete' ) . '</span>';
-
-			// Remove edit link for archived users.
-			unset( $actions['edit'] );
-		}
-
-		return $actions;
-	}
-
-	/**
-	 * Add styles for deleted users in the user list.
-	 *
-	 * Note: Archived users are no longer in wp_users table, so they won't appear
-	 * in the standard user list. This method is kept for legacy compatibility.
-	 */
-	public function add_user_list_styles(): void {
-		// Archived users are removed from wp_users and stored in archive table.
-		// They won't appear in the standard user list, so no styling needed.
-	}
 }
