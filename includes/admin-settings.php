@@ -376,6 +376,13 @@ final class User_Self_Delete_Admin {
 					</div>
 				<?php endif; ?>
 
+				<div class="postbox">
+					<h3 class="hndle" style="padding: 15px;"><span><?php echo esc_html__( 'Archived Users', 'user-self-delete' ); ?></span></h3>
+					<div class="inside">
+						<?php $this->display_archived_users(); ?>
+					</div>
+				</div>
+
 				<!-- GDPR Info -->
 				<div class="postbox">
 					<h3 class="hndle" style="padding: 15px;"><span><?php echo esc_html__( 'GDPR & Legal Compliance', 'user-self-delete' ); ?></span></h3>
@@ -699,6 +706,89 @@ final class User_Self_Delete_Admin {
 
 		echo '</tbody>';
 		echo '</table>';
+	}
+
+	/**
+	 * Display archived (soft-deleted) users.
+	 */
+	private function display_archived_users(): void {
+		global $wpdb;
+
+		$archive_table = $wpdb->prefix . 'user_self_delete_archive';
+
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $archive_table ) ) !== $archive_table ) {
+			echo '<p>' . esc_html__( 'No archived users data available.', 'user-self-delete' ) . '</p>';
+			return;
+		}
+
+		$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$archive_table}" );
+
+		if ( 0 === $total ) {
+			echo '<p>' . esc_html__( 'No archived users.', 'user-self-delete' ) . '</p>';
+			return;
+		}
+
+		$per_page     = 20;
+		$current_page = max( 1, (int) ( $_GET['archived_paged'] ?? 1 ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		$offset       = ( $current_page - 1 ) * $per_page;
+
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT original_email, deletion_date, scheduled_deletion_date, retention_years
+				 FROM {$archive_table}
+				 ORDER BY deletion_date DESC
+				 LIMIT %d OFFSET %d",
+				$per_page,
+				$offset
+			)
+		);
+
+		echo '<table class="widefat">';
+		echo '<thead><tr>';
+		echo '<th>' . esc_html__( 'Original Email', 'user-self-delete' ) . '</th>';
+		echo '<th>' . esc_html__( 'Deleted On', 'user-self-delete' ) . '</th>';
+		echo '<th>' . esc_html__( 'Permanent Removal', 'user-self-delete' ) . '</th>';
+		echo '<th>' . esc_html__( 'Retention', 'user-self-delete' ) . '</th>';
+		echo '</tr></thead>';
+		echo '<tbody>';
+
+		foreach ( $results as $row ) {
+			$permanent = $row->scheduled_deletion_date
+				? esc_html( gmdate( 'Y-m-d', strtotime( $row->scheduled_deletion_date ) ) )
+				: esc_html__( 'Immediate', 'user-self-delete' );
+
+			echo '<tr>';
+			printf( '<td>%s</td>', esc_html( $row->original_email ) );
+			printf( '<td>%s</td>', esc_html( gmdate( 'Y-m-d', strtotime( $row->deletion_date ) ) ) );
+			printf( '<td>%s</td>', $permanent ); // Already escaped above.
+			printf(
+				'<td>%d %s</td>',
+				(int) $row->retention_years,
+				esc_html( _n( 'year', 'years', (int) $row->retention_years, 'user-self-delete' ) )
+			);
+			echo '</tr>';
+		}
+
+		echo '</tbody></table>';
+
+		// Simple pagination.
+		$total_pages = (int) ceil( $total / $per_page );
+		if ( $total_pages > 1 ) {
+			$base_url = admin_url( 'options-general.php?page=user-self-delete' );
+			echo '<div class="tablenav bottom"><div class="tablenav-pages" style="margin: 10px 0;">';
+			for ( $i = 1; $i <= $total_pages; $i++ ) {
+				if ( $i === $current_page ) {
+					printf( '<span class="button button-disabled" style="margin-right:4px;">%d</span>', $i );
+				} else {
+					printf(
+						'<a class="button" href="%s" style="margin-right:4px;">%d</a>',
+						esc_url( add_query_arg( 'archived_paged', $i, $base_url ) ),
+						$i
+					);
+				}
+			}
+			echo '</div></div>';
+		}
 	}
 
 	/**
