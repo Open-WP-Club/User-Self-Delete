@@ -282,13 +282,13 @@ This plugin helps meet GDPR and data retention requirements but does not guarant
 
 These companies help keep Open WP Club plugins free and maintained.
 
-[![Open WP Club supporters](https://openwpclub.com/sponsorship/supporters.png)](https://openwpclub.com/sponsors/)
+<a href="https://openwpclub.com/sponsors/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://openwpclub.com/sponsorship/supporters-dark.png"><img src="https://openwpclub.com/sponsorship/supporters.png" alt="Open WP Club supporters" width="960"></picture></a>
 
 ## Sponsored placements
 
 Clearly labelled promotional campaigns, separate from our supporters.
 
-[![Open WP Club sponsored placements](https://openwpclub.com/sponsorship/repos/user-self-delete/campaigns.png)](https://openwpclub.com/advertise/)
+<a href="https://openwpclub.com/advertise/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://openwpclub.com/sponsorship/repos/user-self-delete/campaigns-dark.png"><img src="https://openwpclub.com/sponsorship/repos/user-self-delete/campaigns.png" alt="Open WP Club sponsored placements" width="960"></picture></a>
 
 [Support our work](https://openwpclub.com/sponsors/) · [Discuss a campaign](https://openwpclub.com/advertise/)
 <!-- OPENWPCLUB_SPONSORS_END -->
