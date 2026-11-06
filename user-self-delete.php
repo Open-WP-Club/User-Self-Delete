@@ -12,9 +12,9 @@
  * Domain Path: /languages
  * Requires at least: 6.4
  * Requires PHP: 8.2
- * Tested up to: 6.8
+ * Tested up to: 7.1.4
  * WC requires at least: 7.0
- * WC tested up to: 9.9
+ * WC tested up to: 11.2.2
  *
  * @package UserSelfDelete
  */
